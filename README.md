@@ -19,7 +19,22 @@ A Chrome extension that lets you chat with any webpage using AI. Extract content
 
 ## 🚀 Quick Start
 
-### Installation
+### For Users (Recommended)
+
+1. **Download the latest release**:
+   - Go to [Releases](https://github.com/pjq/chrome-chat/releases/latest)
+   - Download `chat-with-pages-vX.X.X.zip`
+
+2. **Extract the zip file**:
+   - Unzip the downloaded file to a folder on your computer
+
+3. **Load in Chrome**:
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" (toggle in top right)
+   - Click "Load unpacked"
+   - Select the extracted folder
+
+### For Developers
 
 1. **Clone the repository**:
 ```bash
