@@ -20,7 +20,7 @@ interface ChatState {
   error: string | null;
 
   // Session management
-  createSession: (content: ExtractedContent, tabId?: number) => string;
+  createSession: (content: ExtractedContent | null, tabId?: number) => string;
   getSessionByTabId: (tabId: number) => ChatSession | null;
   switchSession: (sessionId: string) => void;
   clearCurrentSession: () => void;
@@ -52,11 +52,11 @@ export const useChatStore = create<ChatState>()(
       /**
        * Create a new chat session
        */
-      createSession: (content: ExtractedContent, tabId?: number) => {
+      createSession: (content: ExtractedContent | null, tabId?: number) => {
         const sessionId = `session-${Date.now()}`;
         const newSession: ChatSession = {
           id: sessionId,
-          title: content.title || 'New Chat',
+          title: content?.title || 'New Chat',
           messages: [],
           content,
           createdAt: Date.now(),

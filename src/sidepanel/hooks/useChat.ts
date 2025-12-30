@@ -31,11 +31,6 @@ export function useChat() {
       return;
     }
 
-    if (!currentSession.content) {
-      setError('No page content available. Please extract content first.');
-      return;
-    }
-
     if (!settings.apiKey) {
       setError('API key not configured. Please update settings.');
       return;
@@ -115,9 +110,16 @@ export function useChat() {
     }
 
     // Prepare messages with system prompt and context
+    let systemPromptContent = settings.systemPrompt;
+
+    // Add webpage context if available
+    if (currentSession.content) {
+      systemPromptContent += `\n\nWeb page content:\nTitle: ${currentSession.content.title}\nURL: ${currentSession.content.url}\n\n${currentSession.content.textContent.slice(0, 8000)}`;
+    }
+
     const systemMessage: ChatMessage = {
       role: 'system',
-      content: `${settings.systemPrompt}\n\nWeb page content:\nTitle: ${currentSession.content?.title}\nURL: ${currentSession.content?.url}\n\n${currentSession.content?.textContent.slice(0, 8000)}`,
+      content: systemPromptContent,
       timestamp: Date.now(),
     };
 

@@ -131,6 +131,13 @@ function App() {
     if (content && currentTabId) {
       const existingSession = getSessionByTabId(currentTabId);
 
+      // If we don't have a current session, it means we want to create a new one
+      // (e.g., user clicked "+", or switched to a tab without a session)
+      if (!currentSession) {
+        createSession(content, currentTabId);
+        return;
+      }
+
       // If there's an existing session and we're already using it, check if we need to update
       if (existingSession && currentSession?.id === existingSession.id) {
         // We're in the right session for this tab
@@ -154,13 +161,18 @@ function App() {
     extractContent();
   };
 
-  const handleNewChat = () => {
-    if (content && currentTabId) {
-      // Force create new session for current tab, even if one exists
-      createSession(content, currentTabId);
-    } else if (currentTabId) {
-      // If no content yet, extract it first
-      extractContent();
+  const handleNewChat = async () => {
+    if (!currentTabId) return;
+
+    // If on a valid page, extract content first to get latest page data
+    if (isValidPage) {
+      // Clear current session to show loading state
+      clearCurrentSession();
+      // Extract content - this will trigger session creation in the useEffect
+      await extractContent();
+    } else {
+      // For invalid pages (new tabs, chrome pages), create session without content
+      createSession(null, currentTabId);
     }
   };
 
@@ -244,24 +256,23 @@ function App() {
                     Ready to chat!
                   </h2>
                   <p className="text-gray-600 mb-4">
-                    Navigate to any webpage to start chatting about its content.
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Or click the refresh button to load the current page.
+                    {isValidPage
+                      ? 'Click refresh to load the current page content, or just start chatting!'
+                      : 'Start chatting or navigate to a webpage to chat about its content.'}
                   </p>
                 </div>
               </div>
               {/* Show input even without session */}
               <ChatInput
                 onSend={async (message, images) => {
-                  // If no session, create one first by extracting content
-                  if (!currentSession && content) {
-                    await createSession(content, currentTabId || undefined);
+                  // If no session, create one first (with or without content)
+                  if (!currentSession) {
+                    await createSession(content || null, currentTabId || undefined);
                   }
                   // Send the message
                   sendMessage(message, images);
                 }}
-                disabled={!isValidPage || isExtracting}
+                disabled={isExtracting}
               />
             </div>
           )

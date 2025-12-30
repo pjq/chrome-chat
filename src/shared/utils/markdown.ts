@@ -48,7 +48,7 @@ ${markdown}
 
 ---
 
-*Converted by Web Content Chat & Markdown Extension*
+*Converted by Chat with Pages*
 `;
 }
 
