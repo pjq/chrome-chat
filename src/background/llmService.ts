@@ -19,10 +19,46 @@ export async function streamChatMessage(
   try {
     const openAIRequest: OpenAIRequest = {
       model: settings.model,
-      messages: messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
+      messages: messages.map((msg) => {
+        // If message has images, use vision API format with content array
+        if (msg.images && msg.images.length > 0) {
+          const contentParts: Array<{
+            type: 'text' | 'image_url';
+            text?: string;
+            image_url?: { url: string; detail?: 'low' | 'high' | 'auto' };
+          }> = [];
+
+          // Add text content
+          if (msg.content) {
+            contentParts.push({
+              type: 'text',
+              text: msg.content,
+            });
+          }
+
+          // Add images
+          msg.images.forEach((img) => {
+            contentParts.push({
+              type: 'image_url',
+              image_url: {
+                url: img.data,
+                detail: 'auto',
+              },
+            });
+          });
+
+          return {
+            role: msg.role,
+            content: contentParts,
+          };
+        }
+
+        // Regular text message
+        return {
+          role: msg.role,
+          content: msg.content,
+        };
+      }),
       stream: true, // Enable streaming
     };
 

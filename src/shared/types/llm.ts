@@ -11,11 +11,18 @@ export interface LLMSettings {
   systemPrompt: string;
 }
 
+export interface ImageAttachment {
+  data: string; // base64 data URL
+  mimeType: string;
+  name?: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
   error?: string;
+  images?: ImageAttachment[];
 }
 
 export interface LLMRequest {
@@ -30,7 +37,14 @@ export interface LLMResponse {
 
 export interface OpenAIMessage {
   role: string;
-  content: string;
+  content: string | Array<{
+    type: 'text' | 'image_url';
+    text?: string;
+    image_url?: {
+      url: string;
+      detail?: 'low' | 'high' | 'auto';
+    };
+  }>;
 }
 
 export interface OpenAIRequest {

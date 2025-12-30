@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { MessageType } from '@/shared/types/messages';
-import type { ChatMessage } from '@/shared/types/llm';
+import type { ChatMessage, ImageAttachment } from '@/shared/types/llm';
 
 export function useChat() {
   const {
@@ -20,8 +20,8 @@ export function useChat() {
   /**
    * Send a message to the LLM with streaming
    */
-  const sendMessage = async (userMessage: string) => {
-    if (!userMessage.trim()) {
+  const sendMessage = async (userMessage: string, images?: ImageAttachment[]) => {
+    if (!userMessage.trim() && (!images || images.length === 0)) {
       return;
     }
 
@@ -44,8 +44,9 @@ export function useChat() {
     // Add user message
     const userChatMessage: ChatMessage = {
       role: 'user',
-      content: userMessage,
+      content: userMessage || 'Here are some images:',
       timestamp: Date.now(),
+      images,
     };
     addMessage(userChatMessage);
 

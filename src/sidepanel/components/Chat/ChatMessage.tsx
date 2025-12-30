@@ -57,6 +57,20 @@ export function ChatMessage({ message, onRetry, showRetry }: ChatMessageProps) {
           </div>
         )}
 
+        {/* Images (if any) */}
+        {message.images && message.images.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {message.images.map((img, index) => (
+              <img
+                key={index}
+                src={img.data}
+                alt={img.name || `Image ${index + 1}`}
+                className="max-w-xs max-h-48 rounded border border-gray-300 object-contain"
+              />
+            ))}
+          </div>
+        )}
+
         {/* Message Content */}
         <div
           className={`text-sm prose prose-sm max-w-none overflow-x-auto ${
