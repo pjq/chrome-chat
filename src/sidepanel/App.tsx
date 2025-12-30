@@ -28,7 +28,7 @@ function App() {
     extractContent();
 
     // Listen for tab URL changes and page refreshes
-    const handleTabUpdate = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+    const handleTabUpdate = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
       // Extract when page is complete (includes both URL changes and refreshes)
       if (changeInfo.status === 'complete') {
         extractContent();
