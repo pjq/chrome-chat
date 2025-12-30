@@ -9,14 +9,33 @@ export function ChatInterface() {
   const { sendMessage, retryLastMessage } = useChat();
   const { getCurrentSession, isLoading, error } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   const currentSession = getCurrentSession();
   const messages = currentSession?.messages || [];
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const container = messagesContainerRef.current;
+    const end = messagesEndRef.current;
+
+    if (!container || !end) return;
+
+    // Check if user is near the bottom (within 100px)
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+
+    // Only auto-scroll if:
+    // 1. User is already near the bottom, OR
+    // 2. A new message was added (not just content update)
+    const messageCountChanged = messages.length !== prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+
+    if (isNearBottom || messageCountChanged) {
+      // Use instant scroll during streaming (isLoading), smooth for new messages
+      end.scrollIntoView({ behavior: isLoading ? 'auto' : 'smooth', block: 'nearest' });
+    }
+  }, [messages, isLoading]);
 
   const handleRetry = (index: number) => {
     // Only allow retrying the last message
@@ -28,7 +47,7 @@ export function ChatInterface() {
   return (
     <div className="flex flex-col h-full">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2">
         {messages.length === 0 && !error && (
           <div className="text-center text-gray-500 mt-8">
             <p className="text-lg mb-2">Ready to chat!</p>
