@@ -14,7 +14,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [currentTabId, setCurrentTabId] = useState<number | null>(null);
-  const { content, isLoading: isExtracting, error, extractContent } = usePageContent();
+  const { content, isLoading: isExtracting, error, extractContent, clearContent } = usePageContent();
   const { loadSettings } = useSettings();
   const { createSession, getCurrentSession, setContent, getSessionByTabId, switchSession } = useChatStore();
 
@@ -63,11 +63,16 @@ function App() {
     const handleTabActivated = async (activeInfo: chrome.tabs.TabActiveInfo) => {
       setCurrentTabId(activeInfo.tabId);
 
+      // Clear stale content from previous tab to prevent wrong updates
+      clearContent();
+
       // Check if this tab already has a session
       const existingSession = getSessionByTabId(activeInfo.tabId);
       if (existingSession) {
         // Switch to existing session for this tab
         switchSession(existingSession.id);
+        // Extract fresh content to update title/content if page changed
+        extractContent();
       } else {
         // Extract content for this tab
         extractContent();

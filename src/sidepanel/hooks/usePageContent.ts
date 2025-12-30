@@ -26,6 +26,13 @@ export function usePageContent() {
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * Clear the current content state
+   */
+  const clearContent = () => {
+    setContentState(null);
+  };
+
+  /**
    * Extract content from the current page with retry logic
    */
   const extractContent = async (retryCount = 0) => {
@@ -95,5 +102,6 @@ export function usePageContent() {
     isLoading,
     error,
     extractContent,
+    clearContent,
   };
 }
