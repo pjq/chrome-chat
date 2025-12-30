@@ -107,6 +107,67 @@ git push origin "v${NEW_VERSION}"
 echo -e "${GREEN}✓ Pushed to GitHub${NC}"
 echo ""
 
+# Create GitHub Release
+echo -e "${BLUE}📝 Creating GitHub Release...${NC}"
+
+# Check if gh CLI is authenticated
+if ! gh auth status &> /dev/null; then
+    echo -e "${YELLOW}⚠️  GitHub CLI not authenticated${NC}"
+    echo -e "${YELLOW}   Run 'gh auth login' to set up authentication${NC}"
+    echo -e "${YELLOW}   Or create release manually at: https://github.com/pjq/chrome-chat/releases/new?tag=v${NEW_VERSION}${NC}"
+else
+    # Create release with gh CLI
+    gh release create "v${NEW_VERSION}" \
+        --title "Chat with Pages v${NEW_VERSION}" \
+        --notes "# Chat with Pages v${NEW_VERSION} 🎉
+
+## ✨ Features
+
+- 💬 **Chat with Pages**: Have natural conversations about any webpage using AI
+- 📚 **Chat History**: Save and switch between multiple chat sessions
+- 🔄 **Retry & Copy**: Retry failed responses or copy any message to clipboard
+- 🎨 **Markdown Rendering**: Beautiful formatting with code syntax highlighting
+- 📥 **Export to Markdown**: Download pages as clean markdown files
+- 🔌 **Multiple AI Services**: Support for OpenAI Compatible and OpenRouter APIs
+- ⚡ **Streaming Responses**: Real-time message streaming for better UX
+- 💾 **Persistent Storage**: Chat history saved across browser sessions
+
+## 🚀 Getting Started
+
+1. Download the extension package below
+2. Extract the zip file
+3. Load in Chrome:
+   - Open \\\`chrome://extensions/\\\`
+   - Enable \"Developer mode\"
+   - Click \"Load unpacked\"
+   - Select the extracted folder
+4. Configure your AI service in settings
+5. Start chatting with webpages!
+
+## 📖 Documentation
+
+See [README.md](https://github.com/pjq/chrome-chat#readme) for complete documentation.
+
+## 🔒 Security
+
+- API keys stored locally (not synced)
+- No data collection or tracking
+- Direct API calls from your browser
+
+## 🙏 Acknowledgments
+
+Built with ❤️ using [Claude Code](https://claude.com/claude-code)" \
+        "releases/${RELEASE_NAME}"
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ GitHub Release created${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Failed to create GitHub Release${NC}"
+        echo -e "${YELLOW}   Create manually at: https://github.com/pjq/chrome-chat/releases/new?tag=v${NEW_VERSION}${NC}"
+    fi
+fi
+echo ""
+
 # Summary
 echo -e "${GREEN}════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}🎉 Release v${NEW_VERSION} completed successfully!${NC}"
@@ -114,13 +175,14 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo -e "${YELLOW}Release package: ${RELEASE_NAME}${NC}"
 echo -e "${YELLOW}Git tag: v${NEW_VERSION}${NC}"
+echo -e "${YELLOW}GitHub Release: https://github.com/pjq/chrome-chat/releases/tag/v${NEW_VERSION}${NC}"
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
 echo -e "  1. Upload ${RELEASE_NAME} to Chrome Web Store"
-echo -e "  2. Create GitHub release at: https://github.com/pjq/chrome-chat/releases/new?tag=v${NEW_VERSION}"
-echo -e "  3. Attach the release zip file to the GitHub release"
+echo -e "  2. Download: https://github.com/pjq/chrome-chat/releases/download/v${NEW_VERSION}/${RELEASE_NAME}"
 echo ""
 echo -e "${BLUE}To undo this release (if needed):${NC}"
+echo -e "  gh release delete v${NEW_VERSION} --yes"
 echo -e "  git tag -d v${NEW_VERSION}"
 echo -e "  git push origin :refs/tags/v${NEW_VERSION}"
 echo ""
