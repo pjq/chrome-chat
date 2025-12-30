@@ -110,60 +110,49 @@ echo ""
 # Create GitHub Release
 echo -e "${BLUE}📝 Creating GitHub Release...${NC}"
 
-# Check if gh CLI is authenticated
-if ! gh auth status &> /dev/null; then
-    echo -e "${YELLOW}⚠️  GitHub CLI not authenticated${NC}"
-    echo -e "${YELLOW}   Run 'gh auth login' to set up authentication${NC}"
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo -e "${YELLOW}⚠️  GITHUB_TOKEN not set${NC}"
+    echo -e "${YELLOW}   Set it in ~/.zshrc: export GITHUB_TOKEN=\"your_token\"${NC}"
     echo -e "${YELLOW}   Or create release manually at: https://github.com/pjq/chrome-chat/releases/new?tag=v${NEW_VERSION}${NC}"
 else
-    # Create release with gh CLI
-    gh release create "v${NEW_VERSION}" \
-        --title "Chat with Pages v${NEW_VERSION}" \
-        --notes "# Chat with Pages v${NEW_VERSION} 🎉
+    # Create release using GitHub API
+    RESPONSE=$(curl -s -X POST \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      https://api.github.com/repos/pjq/chrome-chat/releases \
+      -d @- <<EOF
+{
+  "tag_name": "v${NEW_VERSION}",
+  "name": "Chat with Pages v${NEW_VERSION}",
+  "body": "# Chat with Pages v${NEW_VERSION} 🎉\n\nFirst official release!\n\n## ✨ Features\n\n- 💬 **Chat with Pages**: Have natural conversations about any webpage using AI\n- 📚 **Chat History**: Save and switch between multiple chat sessions\n- 🔄 **Retry & Copy**: Retry failed responses or copy any message to clipboard\n- 🎨 **Markdown Rendering**: Beautiful formatting with code syntax highlighting\n- 📥 **Export to Markdown**: Download pages as clean markdown files\n- 🔌 **Multiple AI Services**: Support for OpenAI Compatible and OpenRouter APIs\n- ⚡ **Streaming Responses**: Real-time message streaming for better UX\n- 💾 **Persistent Storage**: Chat history saved across browser sessions\n\n## 🚀 Getting Started\n\n1. Download the extension package below\n2. Extract the zip file\n3. Load in Chrome:\n   - Open \`chrome://extensions/\`\n   - Enable \\\"Developer mode\\\"\n   - Click \\\"Load unpacked\\\"\n   - Select the extracted folder\n4. Configure your AI service in settings\n5. Start chatting with webpages!\n\n## 📖 Documentation\n\nSee [README.md](https://github.com/pjq/chrome-chat#readme) for complete documentation.\n\n## 🔒 Security\n\n- API keys stored locally (not synced)\n- No data collection or tracking\n- Direct API calls from your browser\n\n## 🙏 Acknowledgments\n\nBuilt with ❤️ using [Claude Code](https://claude.com/claude-code)",
+  "draft": false,
+  "prerelease": false
+}
+EOF
+)
 
-## ✨ Features
+    RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id": *[0-9]*' | head -1 | grep -o '[0-9]*')
+    UPLOAD_URL=$(echo "$RESPONSE" | grep -o '"upload_url": *"[^"]*"' | head -1 | sed 's/"upload_url": *"\([^{]*\).*/\1/')
 
-- 💬 **Chat with Pages**: Have natural conversations about any webpage using AI
-- 📚 **Chat History**: Save and switch between multiple chat sessions
-- 🔄 **Retry & Copy**: Retry failed responses or copy any message to clipboard
-- 🎨 **Markdown Rendering**: Beautiful formatting with code syntax highlighting
-- 📥 **Export to Markdown**: Download pages as clean markdown files
-- 🔌 **Multiple AI Services**: Support for OpenAI Compatible and OpenRouter APIs
-- ⚡ **Streaming Responses**: Real-time message streaming for better UX
-- 💾 **Persistent Storage**: Chat history saved across browser sessions
-
-## 🚀 Getting Started
-
-1. Download the extension package below
-2. Extract the zip file
-3. Load in Chrome:
-   - Open \\\`chrome://extensions/\\\`
-   - Enable \"Developer mode\"
-   - Click \"Load unpacked\"
-   - Select the extracted folder
-4. Configure your AI service in settings
-5. Start chatting with webpages!
-
-## 📖 Documentation
-
-See [README.md](https://github.com/pjq/chrome-chat#readme) for complete documentation.
-
-## 🔒 Security
-
-- API keys stored locally (not synced)
-- No data collection or tracking
-- Direct API calls from your browser
-
-## 🙏 Acknowledgments
-
-Built with ❤️ using [Claude Code](https://claude.com/claude-code)" \
-        "releases/${RELEASE_NAME}"
-
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ GitHub Release created${NC}"
-    else
+    if [ -z "$RELEASE_ID" ]; then
         echo -e "${YELLOW}⚠️  Failed to create GitHub Release${NC}"
+        echo "$RESPONSE" | head -5
         echo -e "${YELLOW}   Create manually at: https://github.com/pjq/chrome-chat/releases/new?tag=v${NEW_VERSION}${NC}"
+    else
+        echo -e "${GREEN}✓ GitHub Release created (ID: $RELEASE_ID)${NC}"
+
+        # Upload the zip file
+        echo -e "${BLUE}📤 Uploading release asset...${NC}"
+        curl -s -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -H "Content-Type: application/zip" \
+          --data-binary @"releases/${RELEASE_NAME}" \
+          "${UPLOAD_URL}?name=${RELEASE_NAME}" > /dev/null
+
+        echo -e "${GREEN}✓ Release asset uploaded${NC}"
     fi
 fi
 echo ""

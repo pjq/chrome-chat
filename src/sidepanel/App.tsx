@@ -8,13 +8,15 @@ import { Spinner } from './components/common/Spinner';
 import { usePageContent } from './hooks/usePageContent';
 import { useSettings } from './hooks/useSettings';
 import { useChatStore } from './store/chatStore';
+import { getCurrentTab } from '@/shared/utils/chromeApi';
 
 function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [currentTabId, setCurrentTabId] = useState<number | null>(null);
   const { content, isLoading: isExtracting, error, extractContent } = usePageContent();
   const { loadSettings } = useSettings();
-  const { createSession, getCurrentSession, setContent } = useChatStore();
+  const { createSession, getCurrentSession, setContent, getSessionByTabId, switchSession } = useChatStore();
 
   const currentSession = getCurrentSession();
 
@@ -23,22 +25,53 @@ function App() {
     loadSettings();
   }, []);
 
-  // Extract content on mount and when URL changes
+  // Extract content and manage tab-based sessions
   useEffect(() => {
-    extractContent();
+    const initializeTab = async () => {
+      const tab = await getCurrentTab();
+      if (tab.id) {
+        setCurrentTabId(tab.id);
+
+        // Check if this tab already has a session
+        const existingSession = getSessionByTabId(tab.id);
+        if (existingSession) {
+          // Switch to existing session for this tab
+          switchSession(existingSession.id);
+        } else {
+          // Extract content for new tab
+          extractContent();
+        }
+      }
+    };
+
+    initializeTab();
 
     // Listen for tab URL changes and page refreshes
-    const handleTabUpdate = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
+    const handleTabUpdate = async (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
+      // Only handle updates for the current active tab
+      const currentTab = await getCurrentTab();
+      if (currentTab.id !== tabId) return;
+
       // Extract when page is complete (includes both URL changes and refreshes)
       if (changeInfo.status === 'complete') {
+        setCurrentTabId(tabId);
         extractContent();
       }
     };
 
     // Listen for tab switches (when user switches to a different tab)
-    const handleTabActivated = (_activeInfo: chrome.tabs.TabActiveInfo) => {
-      // Extract content from the newly activated tab
-      extractContent();
+    const handleTabActivated = async (activeInfo: chrome.tabs.TabActiveInfo) => {
+      setCurrentTabId(activeInfo.tabId);
+
+      // Check if this tab already has a session
+      const existingSession = getSessionByTabId(activeInfo.tabId);
+      if (existingSession) {
+        // Switch to existing session for this tab
+        switchSession(existingSession.id);
+      } else {
+        // Extract content for this tab
+        extractContent();
+      }
     };
 
     chrome.tabs.onUpdated.addListener(handleTabUpdate);
@@ -53,19 +86,21 @@ function App() {
 
   // Create new session or update content when extracted
   useEffect(() => {
-    if (content) {
-      if (!currentSession) {
-        // Create first session
-        createSession(content);
-      } else if (currentSession.content?.url !== content.url) {
-        // Create new session for different page
-        createSession(content);
+    if (content && currentTabId) {
+      const existingSession = getSessionByTabId(currentTabId);
+
+      if (!existingSession) {
+        // Create new session for this tab
+        createSession(content, currentTabId);
+      } else if (existingSession.content?.url !== content.url) {
+        // URL changed in this tab - create new session
+        createSession(content, currentTabId);
       } else {
-        // Update content for same page
+        // Same tab, same URL - just update content (e.g., page refresh)
         setContent(content);
       }
     }
-  }, [content]);
+  }, [content, currentTabId]);
 
   const handleRefresh = () => {
     extractContent();

@@ -10,6 +10,7 @@ export interface ChatSession {
   content: ExtractedContent | null;
   createdAt: number;
   updatedAt: number;
+  tabId?: number; // Track which browser tab this session belongs to
 }
 
 interface ChatState {
@@ -19,7 +20,8 @@ interface ChatState {
   error: string | null;
 
   // Session management
-  createSession: (content: ExtractedContent) => string;
+  createSession: (content: ExtractedContent, tabId?: number) => string;
+  getSessionByTabId: (tabId: number) => ChatSession | null;
   switchSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   getCurrentSession: () => ChatSession | null;
@@ -49,7 +51,7 @@ export const useChatStore = create<ChatState>()(
       /**
        * Create a new chat session
        */
-      createSession: (content: ExtractedContent) => {
+      createSession: (content: ExtractedContent, tabId?: number) => {
         const sessionId = `session-${Date.now()}`;
         const newSession: ChatSession = {
           id: sessionId,
@@ -58,6 +60,7 @@ export const useChatStore = create<ChatState>()(
           content,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          tabId,
         };
 
         set((state) => ({
@@ -67,6 +70,14 @@ export const useChatStore = create<ChatState>()(
         }));
 
         return sessionId;
+      },
+
+      /**
+       * Get session by tab ID
+       */
+      getSessionByTabId: (tabId: number) => {
+        const state = get();
+        return state.sessions.find((s) => s.tabId === tabId) || null;
       },
 
       /**
