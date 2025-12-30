@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChatHeader } from './components/Chat/ChatHeader';
 import { ChatInterface } from './components/Chat/ChatInterface';
+import { ChatInput } from './components/Chat/ChatInput';
 import { ChatHistory } from './components/Chat/ChatHistory';
 import { MarkdownDownload } from './components/Markdown/MarkdownDownload';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
@@ -217,35 +218,44 @@ function App() {
         </div>
       )}
 
-      {!currentSession && !isExtracting && !error && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center max-w-md">
-            <div className="mb-4">
-              <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
+      {/* Always show chat interface structure */}
+      <div className="flex-1 overflow-hidden">
+        {currentSession ? (
+          <ChatInterface />
+        ) : (
+          !isExtracting && !error && (
+            <div className="h-full flex flex-col">
+              <div className="flex-1 flex items-center justify-center p-4">
+                <div className="text-center max-w-md">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                    Ready to chat!
+                  </h2>
+                  <p className="text-gray-600 mb-4">
+                    Navigate to any webpage to start chatting about its content.
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Or click the refresh button to load the current page.
+                  </p>
+                </div>
+              </div>
+              {/* Show input even without session */}
+              <ChatInput
+                onSend={(_message, _images) => {
+                  // Input is disabled, but satisfy the interface
+                }}
+                disabled={true}
+              />
             </div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              Ready to chat!
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Navigate to any webpage to start chatting about its content.
-            </p>
-            <p className="text-sm text-gray-500">
-              Or open a page and click the refresh button to load it.
-            </p>
-          </div>
-        </div>
-      )}
+          )
+        )}
+      </div>
 
-      {currentSession && (
-        <>
-          <div className="flex-1 overflow-hidden">
-            <ChatInterface />
-          </div>
-          {currentSession.content && <MarkdownDownload />}
-        </>
-      )}
+      {currentSession?.content && <MarkdownDownload />}
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
       {showHistory && <ChatHistory onClose={() => setShowHistory(false)} />}
