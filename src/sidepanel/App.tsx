@@ -55,7 +55,7 @@ function App() {
     initializeTab();
 
     // Listen for tab URL changes and page refreshes
-    const handleTabUpdate = async (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
+    const handleTabUpdate = async (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
       // Only handle updates for the current active tab
       const currentTab = await getCurrentTab();
       if (currentTab.id !== tabId) return;
@@ -63,7 +63,17 @@ function App() {
       // Extract when page is complete (includes both URL changes and refreshes)
       if (changeInfo.status === 'complete') {
         setCurrentTabId(tabId);
-        extractContent();
+
+        // Check if this is a valid page before extracting
+        const isValidPage = tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'));
+
+        if (isValidPage) {
+          extractContent();
+        } else {
+          // For invalid pages, clear session to show empty state
+          clearCurrentSession();
+          clearContent();
+        }
       }
     };
 
