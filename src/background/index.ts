@@ -21,22 +21,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Handle extension icon click - open side panel
-chrome.action.onClicked.addListener(async (tab) => {
-  if (tab.id) {
-    try {
-      await chrome.sidePanel.open({ tabId: tab.id });
-    } catch (error) {
-      console.error('Error opening side panel:', error);
-    }
-  }
-});
-
 // Initialize settings on install
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('Extension installed, initializing settings...');
 
   try {
+    // Configure side panel to only open on user action (click), not automatically
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+    console.log('Side panel configured to open only on click');
+
     const existingSettings = await getSettings();
 
     // Only set default settings if none exist
