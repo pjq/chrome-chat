@@ -8,6 +8,7 @@ import { SettingsPanel } from './components/Settings/SettingsPanel';
 import { Spinner } from './components/common/Spinner';
 import { usePageContent } from './hooks/usePageContent';
 import { useSettings } from './hooks/useSettings';
+import { useChat } from './hooks/useChat';
 import { useChatStore } from './store/chatStore';
 import { getCurrentTab } from '@/shared/utils/chromeApi';
 
@@ -15,11 +16,16 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [currentTabId, setCurrentTabId] = useState<number | null>(null);
+  const [currentTabUrl, setCurrentTabUrl] = useState<string>('');
   const { content, isLoading: isExtracting, error, extractContent, clearContent } = usePageContent();
   const { loadSettings } = useSettings();
   const { createSession, getCurrentSession, setContent, getSessionByTabId, switchSession, clearCurrentSession } = useChatStore();
+  const { sendMessage } = useChat();
 
   const currentSession = getCurrentSession();
+
+  // Check if current tab is a valid page
+  const isValidPage = currentTabUrl.startsWith('http://') || currentTabUrl.startsWith('https://');
 
   // Load settings on mount
   useEffect(() => {
@@ -32,6 +38,7 @@ function App() {
       const tab = await getCurrentTab();
       if (tab.id && tab.url) {
         setCurrentTabId(tab.id);
+        setCurrentTabUrl(tab.url);
 
         // Check if this is a valid page (not chrome://, about:, etc.)
         const isValidPage = tab.url.startsWith('http://') || tab.url.startsWith('https://');
@@ -87,6 +94,7 @@ function App() {
 
       // Get tab info to check if it's a valid page
       const tab = await chrome.tabs.get(activeInfo.tabId);
+      setCurrentTabUrl(tab.url || '');
       const isValidPage = tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'));
 
       if (!isValidPage) {
@@ -245,10 +253,15 @@ function App() {
               </div>
               {/* Show input even without session */}
               <ChatInput
-                onSend={(_message, _images) => {
-                  // Input is disabled, but satisfy the interface
+                onSend={async (message, images) => {
+                  // If no session, create one first by extracting content
+                  if (!currentSession && content) {
+                    await createSession(content, currentTabId || undefined);
+                  }
+                  // Send the message
+                  sendMessage(message, images);
                 }}
-                disabled={true}
+                disabled={!isValidPage || isExtracting}
               />
             </div>
           )
