@@ -27,10 +27,10 @@ function App() {
   useEffect(() => {
     extractContent();
 
-    // Listen for tab URL changes
+    // Listen for tab URL changes and page refreshes
     const handleTabUpdate = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-      // Only extract when URL has changed and page is complete
-      if (changeInfo.status === 'complete' && changeInfo.url) {
+      // Extract when page is complete (includes both URL changes and refreshes)
+      if (changeInfo.status === 'complete') {
         extractContent();
       }
     };
