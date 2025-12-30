@@ -18,10 +18,29 @@ function App() {
 
   const currentSession = getCurrentSession();
 
-  // Load settings and extract content on mount
+  // Load settings on mount
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  // Extract content on mount and when URL changes
+  useEffect(() => {
     extractContent();
+
+    // Listen for tab URL changes
+    const handleTabUpdate = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      // Only extract when URL has changed and page is complete
+      if (changeInfo.status === 'complete' && changeInfo.url) {
+        extractContent();
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(handleTabUpdate);
+
+    // Cleanup listener on unmount
+    return () => {
+      chrome.tabs.onUpdated.removeListener(handleTabUpdate);
+    };
   }, []);
 
   // Create new session or update content when extracted
