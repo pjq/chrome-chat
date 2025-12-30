@@ -16,7 +16,7 @@ function App() {
   const [currentTabId, setCurrentTabId] = useState<number | null>(null);
   const { content, isLoading: isExtracting, error, extractContent, clearContent } = usePageContent();
   const { loadSettings } = useSettings();
-  const { createSession, getCurrentSession, setContent, getSessionByTabId, switchSession } = useChatStore();
+  const { createSession, getCurrentSession, setContent, getSessionByTabId, switchSession, clearCurrentSession } = useChatStore();
 
   const currentSession = getCurrentSession();
 
@@ -45,8 +45,10 @@ function App() {
             // Extract content for new tab
             extractContent();
           }
+        } else {
+          // For invalid pages (new tab, chrome pages), clear session to show empty state
+          clearCurrentSession();
         }
-        // For invalid pages (new tab, chrome pages), do nothing - stay in empty state
       }
     };
 
@@ -78,6 +80,7 @@ function App() {
 
       if (!isValidPage) {
         // For new tabs or chrome pages, clear the session to show empty state
+        clearCurrentSession();
         return;
       }
 

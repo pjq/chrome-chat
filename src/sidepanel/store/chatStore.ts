@@ -23,6 +23,7 @@ interface ChatState {
   createSession: (content: ExtractedContent, tabId?: number) => string;
   getSessionByTabId: (tabId: number) => ChatSession | null;
   switchSession: (sessionId: string) => void;
+  clearCurrentSession: () => void;
   deleteSession: (sessionId: string) => void;
   getCurrentSession: () => ChatSession | null;
 
@@ -85,6 +86,13 @@ export const useChatStore = create<ChatState>()(
        */
       switchSession: (sessionId: string) => {
         set({ currentSessionId: sessionId, error: null });
+      },
+
+      /**
+       * Clear current session (show empty state)
+       */
+      clearCurrentSession: () => {
+        set({ currentSessionId: null, error: null });
       },
 
       /**
