@@ -2,6 +2,10 @@
 
 A Chrome extension that lets you chat with any webpage using AI. Extract content, have natural conversations, and export to markdown.
 
+## 📸 Screenshot
+
+![Chat with Pages in action](screenshots/chat_with_pages_main.png)
+
 ## ✨ Features
 
 - **💬 Chat with Pages**: Have natural conversations about any webpage using AI
