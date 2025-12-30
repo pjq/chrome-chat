@@ -89,16 +89,22 @@ function App() {
     if (content && currentTabId) {
       const existingSession = getSessionByTabId(currentTabId);
 
-      if (!existingSession) {
-        // Create new session for this tab
+      // If there's an existing session and we're already using it, check if we need to update
+      if (existingSession && currentSession?.id === existingSession.id) {
+        // We're in the right session for this tab
+        if (existingSession.content?.url !== content.url) {
+          // URL changed in this tab - create new session
+          createSession(content, currentTabId);
+        } else {
+          // Same tab, same URL - just update content (e.g., page refresh)
+          setContent(content);
+        }
+      } else if (!existingSession) {
+        // No session exists for this tab - create new session
         createSession(content, currentTabId);
-      } else if (existingSession.content?.url !== content.url) {
-        // URL changed in this tab - create new session
-        createSession(content, currentTabId);
-      } else {
-        // Same tab, same URL - just update content (e.g., page refresh)
-        setContent(content);
       }
+      // If existingSession exists but we're not in it, do nothing
+      // (we already switched to it in handleTabActivated)
     }
   }, [content, currentTabId]);
 
