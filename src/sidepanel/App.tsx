@@ -155,10 +155,18 @@ function App() {
     }
   };
 
+  // Determine the appropriate title
+  const getTitle = () => {
+    if (currentSession?.title) return currentSession.title;
+    if (content?.title) return content.title;
+    if (isExtracting) return 'Loading...';
+    return 'Chat with Pages';
+  };
+
   return (
     <div className="h-screen flex flex-col bg-white">
       <ChatHeader
-        title={currentSession?.title || content?.title || 'Loading...'}
+        title={getTitle()}
         onSettingsClick={() => setShowSettings(true)}
         onHistoryClick={() => setShowHistory(true)}
         onNewChatClick={handleNewChat}
