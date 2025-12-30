@@ -29,18 +29,24 @@ function App() {
   useEffect(() => {
     const initializeTab = async () => {
       const tab = await getCurrentTab();
-      if (tab.id) {
+      if (tab.id && tab.url) {
         setCurrentTabId(tab.id);
 
-        // Check if this tab already has a session
-        const existingSession = getSessionByTabId(tab.id);
-        if (existingSession) {
-          // Switch to existing session for this tab
-          switchSession(existingSession.id);
-        } else {
-          // Extract content for new tab
-          extractContent();
+        // Check if this is a valid page (not chrome://, about:, etc.)
+        const isValidPage = tab.url.startsWith('http://') || tab.url.startsWith('https://');
+
+        if (isValidPage) {
+          // Check if this tab already has a session
+          const existingSession = getSessionByTabId(tab.id);
+          if (existingSession) {
+            // Switch to existing session for this tab
+            switchSession(existingSession.id);
+          } else {
+            // Extract content for new tab
+            extractContent();
+          }
         }
+        // For invalid pages (new tab, chrome pages), do nothing - stay in empty state
       }
     };
 
@@ -65,6 +71,15 @@ function App() {
 
       // Clear stale content from previous tab to prevent wrong updates
       clearContent();
+
+      // Get tab info to check if it's a valid page
+      const tab = await chrome.tabs.get(activeInfo.tabId);
+      const isValidPage = tab.url && (tab.url.startsWith('http://') || tab.url.startsWith('https://'));
+
+      if (!isValidPage) {
+        // For new tabs or chrome pages, clear the session to show empty state
+        return;
+      }
 
       // Check if this tab already has a session
       const existingSession = getSessionByTabId(activeInfo.tabId);
@@ -118,8 +133,12 @@ function App() {
   };
 
   const handleNewChat = () => {
-    if (content) {
-      createSession(content);
+    if (content && currentTabId) {
+      // Force create new session for current tab, even if one exists
+      createSession(content, currentTabId);
+    } else if (currentTabId) {
+      // If no content yet, extract it first
+      extractContent();
     }
   };
 
@@ -134,7 +153,7 @@ function App() {
         isRefreshing={isExtracting}
       />
 
-      {isExtracting && !content && !currentSession && (
+      {isExtracting && !currentSession && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Spinner size="lg" />
@@ -143,7 +162,7 @@ function App() {
         </div>
       )}
 
-      {error && !content && !currentSession && (
+      {error && !currentSession && (
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
             <div className="flex items-start mb-3">
@@ -173,6 +192,27 @@ function App() {
             >
               Try Again
             </button>
+          </div>
+        </div>
+      )}
+
+      {!currentSession && !isExtracting && !error && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-md">
+            <div className="mb-4">
+              <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Ready to chat!
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Navigate to any webpage to start chatting about its content.
+            </p>
+            <p className="text-sm text-gray-500">
+              Or open a page and click the refresh button to load it.
+            </p>
           </div>
         </div>
       )}
