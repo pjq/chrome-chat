@@ -35,11 +35,19 @@ function App() {
       }
     };
 
-    chrome.tabs.onUpdated.addListener(handleTabUpdate);
+    // Listen for tab switches (when user switches to a different tab)
+    const handleTabActivated = (_activeInfo: chrome.tabs.TabActiveInfo) => {
+      // Extract content from the newly activated tab
+      extractContent();
+    };
 
-    // Cleanup listener on unmount
+    chrome.tabs.onUpdated.addListener(handleTabUpdate);
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+
+    // Cleanup listeners on unmount
     return () => {
       chrome.tabs.onUpdated.removeListener(handleTabUpdate);
+      chrome.tabs.onActivated.removeListener(handleTabActivated);
     };
   }, []);
 
