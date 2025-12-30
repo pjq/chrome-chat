@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chat with Pages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chat with any webpage using AI. Save conversations and export to markdown.",
   "permissions": [
     "activeTab",
@@ -18,8 +18,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/index.ts"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/index.ts"
+      ]
     }
   ],
   "side_panel": {

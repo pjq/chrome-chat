@@ -1,6 +1,6 @@
 {
   "name": "chat-with-pages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chat with any webpage using AI. Save conversations and export to markdown.",
   "type": "module",
   "scripts": {
