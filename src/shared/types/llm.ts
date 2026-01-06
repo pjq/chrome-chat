@@ -1,3 +1,5 @@
+import { MCPSettings } from './mcp';
+
 export enum LLMProvider {
   OPENROUTER = 'openrouter',
   OPENAI_COMPATIBLE = 'openai_compatible',
@@ -9,6 +11,7 @@ export interface LLMSettings {
   apiKey: string;
   model: string;
   systemPrompt: string;
+  mcp?: MCPSettings;
 }
 
 export interface ImageAttachment {

@@ -5,7 +5,12 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   apiEndpoint: 'https://api.openai.com/v1/chat/completions',
   apiKey: '',
   model: 'gpt-4o',
-  systemPrompt: 'You are a helpful assistant that answers questions about web content. Use the provided web page content to answer questions accurately and concisely.',
+  systemPrompt: 'You are a helpful assistant that answers questions about web content (if available). Use the provided web page content to answer questions accurately and concisely. Otherwise, work as a world-class personal assistant.',
+  mcp: {
+    servers: [],
+    enabledByDefault: true,
+    toolCallingMode: 'prompt', // Use prompt-based tool calling by default for better compatibility
+  },
 };
 
 export const STORAGE_KEYS = {

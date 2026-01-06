@@ -4,6 +4,56 @@ import { getSettings, saveSettings } from '@/shared/utils/storage';
 import { streamChatMessage } from './llmService';
 import { MessageType } from '@/shared/types/messages';
 import type { SendChatMessage } from '@/shared/types/messages';
+import { mcpService } from './mcpService';
+
+console.log('Background service worker started');
+
+/**
+ * Connect to enabled MCP servers from settings
+ */
+async function connectMCPServers() {
+  try {
+    const settings = await getSettings();
+    if (!settings?.mcp?.servers) {
+      console.log('[MCP] No servers configured');
+      return;
+    }
+
+    const enabledServers = settings.mcp.servers.filter((s) => s.enabled);
+    console.log(`[MCP] Connecting to ${enabledServers.length} enabled MCP servers...`);
+
+    if (enabledServers.length === 0) {
+      console.log('[MCP] No enabled servers to connect');
+      return;
+    }
+
+    for (const server of enabledServers) {
+      try {
+        console.log(`[MCP] Connecting to ${server.name} (${server.url})...`);
+        const state = await mcpService.connectServer(server);
+        console.log(`[MCP] ✓ Connected to ${server.name}:`, {
+          status: state.status,
+          toolCount: state.tools.length,
+          tools: state.tools.map(t => t.name),
+        });
+      } catch (error) {
+        console.error(`[MCP] ✗ Failed to connect to ${server.name}:`, error);
+      }
+    }
+
+    // Log final state
+    const allTools = mcpService.getAllTools();
+    console.log(`[MCP] Total tools available: ${allTools.length}`, allTools.map(t => t.name));
+  } catch (error) {
+    console.error('[MCP] Error connecting to MCP servers:', error);
+  }
+}
+
+// Initialize MCP servers immediately when service worker loads
+(async () => {
+  console.log('[MCP] Initializing MCP servers on service worker load...');
+  await connectMCPServers();
+})();
 
 // Set up message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -39,9 +89,18 @@ chrome.runtime.onInstalled.addListener(async () => {
     } else {
       console.log('Settings already exist, skipping initialization');
     }
+
+    // Connect to enabled MCP servers
+    await connectMCPServers();
   } catch (error) {
     console.error('Error initializing settings:', error);
   }
+});
+
+// Initialize MCP servers on browser startup (less common)
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('[MCP] Browser starting up, connecting to MCP servers...');
+  await connectMCPServers();
 });
 
 // Handle long-lived connections for streaming
