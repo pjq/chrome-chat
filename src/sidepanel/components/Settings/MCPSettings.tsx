@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useMCPServers } from '../../hooks/useMCPServers';
 import type { MCPServer } from '@/shared/types/mcp';
 import { Button } from '../common/Button';
 
 export function MCPSettings() {
   const { settings, updateSettings } = useSettingsStore();
+  const { getServerState } = useMCPServers();
   const [isAddingServer, setIsAddingServer] = useState(false);
   const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
 
@@ -109,29 +111,88 @@ export function MCPSettings() {
           </div>
         )}
 
-        {mcpServers.map((server) => (
-          <div
-            key={server.id}
-            className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h4 className="font-medium text-gray-900 truncate">{server.name}</h4>
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    server.enabled
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {server.enabled ? 'Enabled' : 'Disabled'}
-                </span>
+        {mcpServers.map((server) => {
+          const state = getServerState(server.id);
+          const isConnected = state?.status === 'connected';
+          const isConnecting = state?.status === 'connecting';
+          const hasError = state?.status === 'error';
+
+          return (
+            <div
+              key={server.id}
+              className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-medium text-gray-900 truncate">{server.name}</h4>
+
+                  {/* Enabled/Disabled Badge */}
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      server.enabled
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {server.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+
+                  {/* Connection Status Badge */}
+                  {server.enabled && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        isConnected
+                          ? 'bg-blue-100 text-blue-800'
+                          : isConnecting
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : hasError
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {isConnected && '● Connected'}
+                      {isConnecting && '⟳ Connecting...'}
+                      {hasError && '✕ Error'}
+                      {!state && '○ Disconnected'}
+                    </span>
+                  )}
+
+                  {/* Tool Count */}
+                  {isConnected && state && state.tools.length > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                      {state.tools.length} {state.tools.length === 1 ? 'tool' : 'tools'}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-sm text-gray-600 truncate mt-1">{server.url}</p>
+
+                {server.description && (
+                  <p className="text-xs text-gray-500 mt-1">{server.description}</p>
+                )}
+
+                {/* Error Message */}
+                {hasError && state?.error && (
+                  <p className="text-xs text-red-600 mt-1">Error: {state.error}</p>
+                )}
+
+                {/* Connected Tools List */}
+                {isConnected && state && state.tools.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                      Available tools ({state.tools.length})
+                    </summary>
+                    <ul className="mt-1 ml-4 text-xs text-gray-600 space-y-0.5">
+                      {state.tools.map((tool) => (
+                        <li key={tool.name} className="truncate">
+                          • <code className="bg-gray-100 px-1 rounded">{tool.name}</code>
+                          {tool.description && <span className="text-gray-500"> - {tool.description}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
-              <p className="text-sm text-gray-600 truncate mt-1">{server.url}</p>
-              {server.description && (
-                <p className="text-xs text-gray-500 mt-1">{server.description}</p>
-              )}
-            </div>
 
             <div className="flex items-center gap-2 ml-4">
               <button
@@ -157,7 +218,8 @@ export function MCPSettings() {
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Add/Edit Server Form */}
