@@ -4,6 +4,7 @@ import { getSettings, saveSettings } from '@/shared/utils/storage';
 import { streamChatMessage } from './llmService';
 import { MessageType } from '@/shared/types/messages';
 import type { SendChatMessage } from '@/shared/types/messages';
+import { mcpService } from './mcpService';
 
 // Set up message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -39,10 +40,45 @@ chrome.runtime.onInstalled.addListener(async () => {
     } else {
       console.log('Settings already exist, skipping initialization');
     }
+
+    // Connect to enabled MCP servers
+    await connectMCPServers();
   } catch (error) {
     console.error('Error initializing settings:', error);
   }
 });
+
+// Initialize MCP servers on startup
+chrome.runtime.onStartup.addListener(async () => {
+  console.log('Extension starting up, connecting to MCP servers...');
+  await connectMCPServers();
+});
+
+/**
+ * Connect to enabled MCP servers from settings
+ */
+async function connectMCPServers() {
+  try {
+    const settings = await getSettings();
+    if (!settings?.mcp?.servers) {
+      return;
+    }
+
+    const enabledServers = settings.mcp.servers.filter((s) => s.enabled);
+    console.log(`Connecting to ${enabledServers.length} enabled MCP servers...`);
+
+    for (const server of enabledServers) {
+      try {
+        const state = await mcpService.connectServer(server);
+        console.log(`Connected to MCP server ${server.name}:`, state);
+      } catch (error) {
+        console.error(`Failed to connect to MCP server ${server.name}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error connecting to MCP servers:', error);
+  }
+}
 
 // Handle long-lived connections for streaming
 chrome.runtime.onConnect.addListener((port) => {

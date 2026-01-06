@@ -4,10 +4,15 @@ import type {
   ExtractContentMessage,
   SendChatMessage,
   UpdateSettingsMessage,
+  MCPConnectServerMessage,
+  MCPDisconnectServerMessage,
+  MCPGetServerStateMessage,
+  MCPCallToolMessage,
 } from '@/shared/types/messages';
 import { sendChatMessage } from './llmService';
 import { getSettings, saveSettings } from '@/shared/utils/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
+import { mcpService } from './mcpService';
 
 /**
  * Main message handler for chrome.runtime.onMessage
@@ -31,6 +36,21 @@ export async function handleMessage(
 
       case MessageType.UPDATE_SETTINGS:
         return await handleUpdateSettings(message as UpdateSettingsMessage);
+
+      case MessageType.MCP_CONNECT_SERVER:
+        return await handleMCPConnectServer(message as MCPConnectServerMessage);
+
+      case MessageType.MCP_DISCONNECT_SERVER:
+        return await handleMCPDisconnectServer(message as MCPDisconnectServerMessage);
+
+      case MessageType.MCP_GET_SERVER_STATE:
+        return await handleMCPGetServerState(message as MCPGetServerStateMessage);
+
+      case MessageType.MCP_GET_ALL_STATES:
+        return await handleMCPGetAllStates();
+
+      case MessageType.MCP_CALL_TOOL:
+        return await handleMCPCallTool(message as MCPCallToolMessage);
 
       default:
         throw new Error(`Unknown message type: ${(message as any).type}`);
@@ -121,7 +141,74 @@ async function handleGetSettings() {
  */
 async function handleUpdateSettings(message: UpdateSettingsMessage) {
   await saveSettings(message.settings);
+
+  // Reconnect to MCP servers if settings changed
+  if (message.settings.mcp?.servers) {
+    await reconnectMCPServers(message.settings.mcp.servers);
+  }
+
   return {
     success: true,
   };
+}
+
+/**
+ * Connect to an MCP server
+ */
+async function handleMCPConnectServer(message: MCPConnectServerMessage) {
+  const state = await mcpService.connectServer(message.server);
+  return { state };
+}
+
+/**
+ * Disconnect from an MCP server
+ */
+async function handleMCPDisconnectServer(message: MCPDisconnectServerMessage) {
+  await mcpService.disconnectServer(message.serverId);
+  return { success: true };
+}
+
+/**
+ * Get MCP server state
+ */
+async function handleMCPGetServerState(message: MCPGetServerStateMessage) {
+  const state = mcpService.getServerState(message.serverId);
+  return { state };
+}
+
+/**
+ * Get all MCP server states
+ */
+async function handleMCPGetAllStates() {
+  const states = mcpService.getAllServerStates();
+  return { states };
+}
+
+/**
+ * Call an MCP tool
+ */
+async function handleMCPCallTool(message: MCPCallToolMessage) {
+  const result = await mcpService.callTool(message.toolCall);
+  return {
+    type: MessageType.MCP_TOOL_RESULT,
+    result,
+  };
+}
+
+/**
+ * Reconnect to MCP servers based on settings
+ */
+async function reconnectMCPServers(servers: any[]) {
+  // Disconnect all existing servers
+  await mcpService.disconnectAll();
+
+  // Connect to enabled servers
+  const enabledServers = servers.filter((s) => s.enabled);
+  for (const server of enabledServers) {
+    try {
+      await mcpService.connectServer(server);
+    } catch (error) {
+      console.error(`Failed to connect to MCP server ${server.name}:`, error);
+    }
+  }
 }

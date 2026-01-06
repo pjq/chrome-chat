@@ -1,5 +1,6 @@
 import type { ExtractedContent } from './content';
 import type { ChatMessage, LLMSettings } from './llm';
+import type { MCPServer, MCPToolCall, MCPToolResult } from './mcp';
 
 export enum MessageType {
   EXTRACT_CONTENT = 'EXTRACT_CONTENT',
@@ -13,6 +14,12 @@ export enum MessageType {
   DOWNLOAD_MARKDOWN = 'DOWNLOAD_MARKDOWN',
   GET_SETTINGS = 'GET_SETTINGS',
   UPDATE_SETTINGS = 'UPDATE_SETTINGS',
+  MCP_CONNECT_SERVER = 'MCP_CONNECT_SERVER',
+  MCP_DISCONNECT_SERVER = 'MCP_DISCONNECT_SERVER',
+  MCP_GET_SERVER_STATE = 'MCP_GET_SERVER_STATE',
+  MCP_GET_ALL_STATES = 'MCP_GET_ALL_STATES',
+  MCP_CALL_TOOL = 'MCP_CALL_TOOL',
+  MCP_TOOL_RESULT = 'MCP_TOOL_RESULT',
 }
 
 export interface BaseMessage {
@@ -81,6 +88,35 @@ export interface UpdateSettingsMessage extends BaseMessage {
   settings: LLMSettings;
 }
 
+export interface MCPConnectServerMessage extends BaseMessage {
+  type: MessageType.MCP_CONNECT_SERVER;
+  server: MCPServer;
+}
+
+export interface MCPDisconnectServerMessage extends BaseMessage {
+  type: MessageType.MCP_DISCONNECT_SERVER;
+  serverId: string;
+}
+
+export interface MCPGetServerStateMessage extends BaseMessage {
+  type: MessageType.MCP_GET_SERVER_STATE;
+  serverId: string;
+}
+
+export interface MCPGetAllStatesMessage extends BaseMessage {
+  type: MessageType.MCP_GET_ALL_STATES;
+}
+
+export interface MCPCallToolMessage extends BaseMessage {
+  type: MessageType.MCP_CALL_TOOL;
+  toolCall: MCPToolCall;
+}
+
+export interface MCPToolResultMessage extends BaseMessage {
+  type: MessageType.MCP_TOOL_RESULT;
+  result: MCPToolResult;
+}
+
 export type Message =
   | ExtractContentMessage
   | ExtractContentResponse
@@ -92,4 +128,10 @@ export type Message =
   | ChatStreamError
   | DownloadMarkdownMessage
   | GetSettingsMessage
-  | UpdateSettingsMessage;
+  | UpdateSettingsMessage
+  | MCPConnectServerMessage
+  | MCPDisconnectServerMessage
+  | MCPGetServerStateMessage
+  | MCPGetAllStatesMessage
+  | MCPCallToolMessage
+  | MCPToolResultMessage;
