@@ -3,6 +3,69 @@ import type {
   LLMResponse,
   OpenAIRequest,
 } from '@/shared/types/llm';
+import { mcpService } from './mcpService';
+
+/**
+ * Format MCP tools for OpenAI tool calling format
+ */
+function formatMCPToolsForOpenAI() {
+  const mcpTools = mcpService.getAllTools();
+
+  return mcpTools.map((tool) => ({
+    type: 'function',
+    function: {
+      name: `mcp_${tool.serverId}_${tool.name}`,
+      description: tool.description,
+      parameters: tool.inputSchema,
+    },
+  }));
+}
+
+/**
+ * Execute tool calls from LLM response
+ */
+async function executeToolCalls(
+  toolCalls: any[],
+  onChunk: (chunk: string) => void
+): Promise<void> {
+  onChunk('\n\n---\n**Executing tools:**\n\n');
+
+  for (const toolCall of toolCalls) {
+    const functionName = toolCall.function.name;
+
+    // Parse MCP tool call: mcp_{serverId}_{toolName}
+    if (functionName.startsWith('mcp_')) {
+      const parts = functionName.split('_');
+      if (parts.length >= 3) {
+        const serverId = parts[1];
+        const toolName = parts.slice(2).join('_');
+
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+
+          onChunk(`🔧 Calling \`${toolName}\` on server \`${serverId}\`...\n`);
+
+          const result = await mcpService.callTool({
+            serverId,
+            toolName,
+            arguments: args,
+          });
+
+          if (result.success) {
+            onChunk(`✅ Tool result:\n\`\`\`json\n${JSON.stringify(result.content, null, 2)}\n\`\`\`\n\n`);
+          } else {
+            onChunk(`❌ Tool error: ${result.error}\n\n`);
+          }
+        } catch (error) {
+          console.error(`Error executing tool ${functionName}:`, error);
+          onChunk(`❌ Error parsing tool call: ${error}\n\n`);
+        }
+      }
+    }
+  }
+
+  onChunk('---\n\n');
+}
 
 /**
  * Stream a chat message from the LLM API
@@ -17,7 +80,10 @@ export async function streamChatMessage(
   const { messages, settings } = request;
 
   try {
-    const openAIRequest: OpenAIRequest = {
+    // Get available MCP tools
+    const tools = formatMCPToolsForOpenAI();
+
+    const openAIRequest: OpenAIRequest & { tools?: any[] } = {
       model: settings.model,
       messages: messages.map((msg) => {
         // If message has images, use vision API format with content array
@@ -60,7 +126,13 @@ export async function streamChatMessage(
         };
       }),
       stream: true, // Enable streaming
+      ...(tools.length > 0 && { tools }), // Include tools if available
     };
+
+    console.log('[LLM] Request with MCP tools:', {
+      toolCount: tools.length,
+      tools: tools.map((t: any) => t.function.name),
+    });
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -91,11 +163,16 @@ export async function streamChatMessage(
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let toolCalls: any[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
 
       if (done) {
+        // Execute any pending tool calls before completing
+        if (toolCalls.length > 0) {
+          await executeToolCalls(toolCalls, onChunk);
+        }
         onComplete();
         break;
       }
@@ -119,9 +196,32 @@ export async function streamChatMessage(
 
           try {
             const data = JSON.parse(jsonStr);
+            const delta = data.choices?.[0]?.delta;
+
+            // Check for tool calls
+            if (delta?.tool_calls) {
+              for (const toolCall of delta.tool_calls) {
+                const index = toolCall.index || 0;
+                if (!toolCalls[index]) {
+                  toolCalls[index] = {
+                    id: toolCall.id,
+                    type: toolCall.type || 'function',
+                    function: {
+                      name: toolCall.function?.name || '',
+                      arguments: toolCall.function?.arguments || '',
+                    },
+                  };
+                } else {
+                  // Accumulate function arguments
+                  if (toolCall.function?.arguments) {
+                    toolCalls[index].function.arguments += toolCall.function.arguments;
+                  }
+                }
+              }
+            }
 
             // Extract content from the delta
-            const content = data.choices?.[0]?.delta?.content;
+            const content = delta?.content;
 
             if (content) {
               onChunk(content);
