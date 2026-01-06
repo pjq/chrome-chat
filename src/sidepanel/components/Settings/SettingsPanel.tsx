@@ -4,6 +4,7 @@ import { TextArea } from '../common/Input';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ModelSelector } from './ModelSelector';
 import { LLMProviderSettings } from './LLMProviderSettings';
+import { MCPSettings } from './MCPSettings';
 import { useSettings } from '../../hooks/useSettings';
 import type { LLMProvider } from '@/shared/types/llm';
 
@@ -102,6 +103,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
             rows={4}
             placeholder="Tell the AI how you'd like it to respond..."
           />
+
+          {/* MCP Settings Section */}
+          <div className="border-t border-gray-200 pt-6">
+            <MCPSettings />
+          </div>
         </div>
 
         {/* Footer */}

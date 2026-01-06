@@ -6,6 +6,10 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   apiKey: '',
   model: 'gpt-4o',
   systemPrompt: 'You are a helpful assistant that answers questions about web content. Use the provided web page content to answer questions accurately and concisely.',
+  mcp: {
+    servers: [],
+    enabledByDefault: true,
+  },
 };
 
 export const STORAGE_KEYS = {
