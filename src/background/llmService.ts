@@ -22,13 +22,148 @@ function formatMCPToolsForOpenAI() {
 }
 
 /**
- * Execute tool calls from LLM response
+ * Format MCP tools as system prompt text (alternative to native function calling)
+ * Uses a concise format to avoid overwhelming the context
+ */
+function formatMCPToolsForSystemPrompt(): string {
+  const mcpTools = mcpService.getAllTools();
+
+  if (mcpTools.length === 0) {
+    return '';
+  }
+
+  // Concise tool list
+  const toolDescriptions = mcpTools.map((tool) => {
+    const params = tool.inputSchema.properties || {};
+    const required = tool.inputSchema.required || [];
+
+    // Only show required params for brevity
+    const requiredParams = required.map(name => {
+      const schema = params[name] as any;
+      return `${name}: ${schema?.description || schema?.type || 'string'}`;
+    }).join(', ');
+
+    return `- ${tool.name}(${requiredParams || 'no params'}): ${tool.description}`;
+  }).join('\n');
+
+  return `
+
+## Tools Available
+
+When you need to use a tool, use this XML format:
+<tool_call>
+<server_id>${mcpTools[0]?.serverId}</server_id>
+<tool_name>tool_name</tool_name>
+<arguments>{"param": "value"}</arguments>
+</tool_call>
+
+${toolDescriptions}`;
+}
+
+/**
+ * Parse tool calls from text response using regex (for prompt-based tool calling)
+ */
+function parseToolCallsFromText(text: string): Array<{
+  serverId: string;
+  toolName: string;
+  arguments: any;
+}> {
+  const toolCalls: Array<{
+    serverId: string;
+    toolName: string;
+    arguments: any;
+  }> = [];
+
+  // Match XML format: <tool_call>...</tool_call>
+  const toolCallRegex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+  let match;
+
+  while ((match = toolCallRegex.exec(text)) !== null) {
+    const content = match[1];
+
+    // Extract server_id, tool_name, and arguments
+    const serverIdMatch = /<server_id>(.*?)<\/server_id>/.exec(content);
+    const toolNameMatch = /<tool_name>(.*?)<\/tool_name>/.exec(content);
+    const argsMatch = /<arguments>([\s\S]*?)<\/arguments>/.exec(content);
+
+    if (serverIdMatch && toolNameMatch && argsMatch) {
+      try {
+        const args = JSON.parse(argsMatch[1].trim());
+        toolCalls.push({
+          serverId: serverIdMatch[1].trim(),
+          toolName: toolNameMatch[1].trim(),
+          arguments: args,
+        });
+      } catch (error) {
+        console.error('Error parsing tool call arguments:', error);
+      }
+    }
+  }
+
+  return toolCalls;
+}
+
+/**
+ * Execute prompt-based tool calls (parsed from text)
+ */
+async function executePromptBasedToolCalls(
+  toolCalls: Array<{ serverId: string; toolName: string; arguments: any }>,
+  onChunk: (chunk: string) => void
+): Promise<string> {
+  if (toolCalls.length === 0) {
+    return '';
+  }
+
+  // Use markdown-friendly format instead of HTML
+  const openingTag = '\n\n---\n**🔧 Using tools**\n\n';
+  onChunk(openingTag);
+  let toolResultsText = openingTag;
+
+  for (const toolCall of toolCalls) {
+    try {
+      console.log(`[Tool] Calling ${toolCall.toolName} with args:`, toolCall.arguments);
+
+      const result = await mcpService.callTool({
+        serverId: toolCall.serverId,
+        toolName: toolCall.toolName,
+        arguments: toolCall.arguments,
+      });
+
+      if (result.success) {
+        onChunk(`✓ ${toolCall.toolName}\n`);
+        toolResultsText += `✓ ${toolCall.toolName}\n`;
+
+        // Format result as text for the next prompt
+        toolResultsText += `\n**Tool Result for ${toolCall.toolName}:**\n\`\`\`json\n${JSON.stringify(result.content, null, 2)}\n\`\`\`\n\n`;
+      } else {
+        onChunk(`✗ ${toolCall.toolName}: ${result.error}\n`);
+        toolResultsText += `✗ ${toolCall.toolName}: ${result.error}\n\n`;
+      }
+    } catch (error) {
+      console.error(`Error executing tool ${toolCall.toolName}:`, error);
+      onChunk(`✗ ${toolCall.toolName}: ${error}\n`);
+      toolResultsText += `✗ ${toolCall.toolName}: ${error}\n\n`;
+    }
+  }
+
+  const closingTag = '---\n\n';
+  onChunk(closingTag);
+  toolResultsText += closingTag;
+
+  return toolResultsText;
+}
+
+/**
+ * Execute native API tool calls (from OpenAI function calling)
  */
 async function executeToolCalls(
   toolCalls: any[],
   onChunk: (chunk: string) => void
-): Promise<void> {
-  onChunk('\n\n---\n**Executing tools:**\n\n');
+): Promise<any[]> {
+  const toolResults: any[] = [];
+
+  // Show a subtle, inline indicator for tool execution
+  onChunk('\n\n---\n**🔧 Using tools**\n\n');
 
   for (const toolCall of toolCalls) {
     const functionName = toolCall.function.name;
@@ -43,7 +178,8 @@ async function executeToolCalls(
         try {
           const args = JSON.parse(toolCall.function.arguments);
 
-          onChunk(`🔧 Calling \`${toolName}\` on server \`${serverId}\`...\n`);
+          // Subtle inline logging
+          console.log(`[Tool] Calling ${toolName} with args:`, args);
 
           const result = await mcpService.callTool({
             serverId,
@@ -52,19 +188,179 @@ async function executeToolCalls(
           });
 
           if (result.success) {
-            onChunk(`✅ Tool result:\n\`\`\`json\n${JSON.stringify(result.content, null, 2)}\n\`\`\`\n\n`);
+            // Show minimal success indicator
+            onChunk(`✓ ${toolName}\n`);
+
+            // Format tool result for LLM
+            toolResults.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(result.content),
+            });
           } else {
-            onChunk(`❌ Tool error: ${result.error}\n\n`);
+            onChunk(`✗ ${toolName}: ${result.error}\n`);
+            toolResults.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: `Error: ${result.error}`,
+            });
           }
         } catch (error) {
           console.error(`Error executing tool ${functionName}:`, error);
-          onChunk(`❌ Error parsing tool call: ${error}\n\n`);
+          onChunk(`✗ ${toolName}: ${error}\n`);
+          toolResults.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: `Error: ${error}`,
+          });
         }
       }
     }
   }
 
   onChunk('---\n\n');
+  return toolResults;
+}
+
+/**
+ * Helper function to process streaming response
+ * In prompt mode, filters out <tool_call> XML from display
+ */
+async function processStreamingResponse(
+  response: Response,
+  onChunk: (chunk: string) => void,
+  filterToolCallXML: boolean = false
+): Promise<{ toolCalls: any[]; finishReason: string | null; contentBeforeToolCalls: string }> {
+  if (!response.body) {
+    throw new Error('Response body is null');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let toolCalls: any[] = [];
+  let finishReason: string | null = null;
+  let contentBeforeToolCalls = ''; // Capture any thinking/explanation before tool calls
+  let displayBuffer = ''; // Buffer for filtering tool call XML from display
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      // Flush any remaining display buffer
+      if (displayBuffer) {
+        if (filterToolCallXML) {
+          // Remove any remaining tool calls before flushing
+          const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/g;
+          const filtered = displayBuffer.replace(toolCallRegex, '');
+          if (filtered.trim()) {
+            onChunk(filtered);
+          }
+        } else {
+          onChunk(displayBuffer);
+        }
+      }
+      break;
+    }
+
+    // Decode the chunk and add to buffer
+    buffer += decoder.decode(value, { stream: true });
+
+    // Process complete lines from buffer
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      if (!trimmedLine || trimmedLine === 'data: [DONE]') {
+        continue;
+      }
+
+      if (trimmedLine.startsWith('data: ')) {
+        const jsonStr = trimmedLine.slice(6); // Remove 'data: ' prefix
+
+        try {
+          const data = JSON.parse(jsonStr);
+          const delta = data.choices?.[0]?.delta;
+          const finish = data.choices?.[0]?.finish_reason;
+
+          if (finish) {
+            finishReason = finish;
+          }
+
+          // Check for tool calls (native mode)
+          if (delta?.tool_calls) {
+            for (const toolCall of delta.tool_calls) {
+              const index = toolCall.index || 0;
+              if (!toolCalls[index]) {
+                toolCalls[index] = {
+                  id: toolCall.id,
+                  type: toolCall.type || 'function',
+                  function: {
+                    name: toolCall.function?.name || '',
+                    arguments: toolCall.function?.arguments || '',
+                  },
+                };
+              } else {
+                // Accumulate function arguments
+                if (toolCall.function?.arguments) {
+                  toolCalls[index].function.arguments += toolCall.function.arguments;
+                }
+                if (toolCall.function?.name) {
+                  toolCalls[index].function.name = toolCall.function.name;
+                }
+              }
+            }
+          }
+
+          // Extract content from the delta
+          const content = delta?.content;
+
+          if (content) {
+            contentBeforeToolCalls += content;
+
+            if (filterToolCallXML) {
+              // In prompt mode, filter out <tool_call> XML from display
+              displayBuffer += content;
+
+              // Check for complete tool_call blocks
+              const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/g;
+
+              // If we have a closing tag, we can safely filter and output
+              if (displayBuffer.includes('</tool_call>')) {
+                // Remove all complete tool call blocks
+                const filtered = displayBuffer.replace(toolCallRegex, '');
+                if (filtered.trim()) {
+                  onChunk(filtered);
+                }
+                displayBuffer = '';
+              } else if (displayBuffer.includes('<tool_call>')) {
+                // We're in the middle of a tool call, keep buffering
+                // Don't output anything yet
+              } else {
+                // No tool call in progress, safe to output
+                // But keep a small buffer in case <tool_call> is about to start
+                if (displayBuffer.length > 50) {
+                  // Output all but the last 20 chars (safety margin for "<tool_call>")
+                  const safeContent = displayBuffer.slice(0, -20);
+                  onChunk(safeContent);
+                  displayBuffer = displayBuffer.slice(-20);
+                }
+              }
+            } else {
+              // Native mode or no filtering - output directly
+              onChunk(content);
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing SSE data:', e, jsonStr);
+        }
+      }
+    }
+  }
+
+  return { toolCalls, finishReason, contentBeforeToolCalls };
 }
 
 /**
@@ -80,12 +376,33 @@ export async function streamChatMessage(
   const { messages, settings } = request;
 
   try {
+    // Determine tool calling mode (default to 'prompt' for better compatibility)
+    const toolCallingMode = settings.mcp?.toolCallingMode || 'prompt';
+
+    console.log(`[LLM] Tool calling mode: ${toolCallingMode}`);
+
     // Get available MCP tools
     const tools = formatMCPToolsForOpenAI();
+    const toolsPromptText = formatMCPToolsForSystemPrompt();
 
-    const openAIRequest: OpenAIRequest & { tools?: any[] } = {
+    console.log('[LLM] Available MCP tools:', tools.length);
+
+    if (tools.length > 0 && toolCallingMode === 'native') {
+      console.log('[LLM] Tool details (native):', JSON.stringify(tools, null, 2));
+    }
+
+    const openAIRequest: OpenAIRequest & { tools?: any[]; tool_choice?: string } = {
       model: settings.model,
       messages: messages.map((msg) => {
+        // Inject tool descriptions into ALL system prompts for prompt-based mode
+        // This ensures tools are available throughout the conversation
+        if (toolCallingMode === 'prompt' && msg.role === 'system' && toolsPromptText) {
+          return {
+            role: msg.role,
+            content: msg.content + toolsPromptText,
+          };
+        }
+
         // If message has images, use vision API format with content array
         if (msg.images && msg.images.length > 0) {
           const contentParts: Array<{
@@ -126,13 +443,20 @@ export async function streamChatMessage(
         };
       }),
       stream: true, // Enable streaming
-      ...(tools.length > 0 && { tools }), // Include tools if available
+      // Only include tools parameter in native mode
+      ...(toolCallingMode === 'native' && tools.length > 0 && {
+        tools,
+        tool_choice: 'auto' // Allow model to decide when to use tools
+      }),
     };
 
-    console.log('[LLM] Request with MCP tools:', {
+    console.log('[LLM] Sending request with tools:', {
       toolCount: tools.length,
-      tools: tools.map((t: any) => t.function.name),
+      toolNames: tools.map((t: any) => t.function.name),
+      model: settings.model,
     });
+
+    console.log('[LLM] Full request:', JSON.stringify(openAIRequest, null, 2));
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -145,7 +469,8 @@ export async function streamChatMessage(
       headers['X-Title'] = 'Web Content Chat Extension';
     }
 
-    const response = await fetch(settings.apiEndpoint, {
+    // Make initial API request
+    let response = await fetch(settings.apiEndpoint, {
       method: 'POST',
       headers,
       body: JSON.stringify(openAIRequest),
@@ -156,82 +481,114 @@ export async function streamChatMessage(
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    if (!response.body) {
-      throw new Error('Response body is null');
+    if (toolCallingMode === 'native') {
+      // Native function calling mode
+      const { toolCalls, finishReason, contentBeforeToolCalls } = await processStreamingResponse(response, onChunk, false);
+
+      // If there are tool calls, execute them and make another API request
+      if (toolCalls.length > 0 && finishReason === 'tool_calls') {
+        // Execute the tools
+        const toolResults = await executeToolCalls(toolCalls, onChunk);
+
+        // Build the assistant message with tool calls
+        const assistantMessage = {
+          role: 'assistant',
+          content: contentBeforeToolCalls || null,
+          tool_calls: toolCalls.map((tc: any) => ({
+            id: tc.id,
+            type: tc.type,
+            function: {
+              name: tc.function.name,
+              arguments: tc.function.arguments,
+            },
+          })),
+        };
+
+        // Prepare messages for second request
+        const followUpMessages = [
+          ...openAIRequest.messages,
+          assistantMessage,
+          ...toolResults,
+        ];
+
+        console.log('[LLM] Making follow-up request with tool results...');
+
+        const followUpRequest = {
+          model: settings.model,
+          messages: followUpMessages,
+          stream: true,
+          ...(tools.length > 0 && {
+            tools,
+            tool_choice: 'auto',
+          }),
+        };
+
+        response = await fetch(settings.apiEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(followUpRequest),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+
+        // Process the follow-up response
+        await processStreamingResponse(response, onChunk, false);
+      }
+    } else {
+      // Prompt-based tool calling mode
+      // Filter out <tool_call> XML from display
+      const { contentBeforeToolCalls } = await processStreamingResponse(response, onChunk, true);
+
+      // Parse tool calls from the text response
+      const promptToolCalls = parseToolCallsFromText(contentBeforeToolCalls);
+
+      console.log(`[LLM] Parsed ${promptToolCalls.length} tool calls from text`);
+
+      if (promptToolCalls.length > 0) {
+        // Execute the tools
+        const toolResultsText = await executePromptBasedToolCalls(promptToolCalls, onChunk);
+
+        // Prepare messages for second request with tool results
+        const followUpMessages = [
+          ...openAIRequest.messages,
+          {
+            role: 'assistant',
+            content: contentBeforeToolCalls, // Keep original response with tool calls for LLM
+          },
+          {
+            role: 'user',
+            content: toolResultsText + '\n\nPlease provide a natural, human-friendly response based on the tool results above.',
+          },
+        ];
+
+        console.log('[LLM] Making follow-up request with tool results (prompt mode)...');
+
+        const followUpRequest = {
+          model: settings.model,
+          messages: followUpMessages,
+          stream: true,
+        };
+
+        response = await fetch(settings.apiEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(followUpRequest),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+
+        // Process the follow-up response (don't filter, it's the natural language answer)
+        await processStreamingResponse(response, onChunk, false);
+      }
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let toolCalls: any[] = [];
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        // Execute any pending tool calls before completing
-        if (toolCalls.length > 0) {
-          await executeToolCalls(toolCalls, onChunk);
-        }
-        onComplete();
-        break;
-      }
-
-      // Decode the chunk and add to buffer
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete lines from buffer
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        if (!trimmedLine || trimmedLine === 'data: [DONE]') {
-          continue;
-        }
-
-        if (trimmedLine.startsWith('data: ')) {
-          const jsonStr = trimmedLine.slice(6); // Remove 'data: ' prefix
-
-          try {
-            const data = JSON.parse(jsonStr);
-            const delta = data.choices?.[0]?.delta;
-
-            // Check for tool calls
-            if (delta?.tool_calls) {
-              for (const toolCall of delta.tool_calls) {
-                const index = toolCall.index || 0;
-                if (!toolCalls[index]) {
-                  toolCalls[index] = {
-                    id: toolCall.id,
-                    type: toolCall.type || 'function',
-                    function: {
-                      name: toolCall.function?.name || '',
-                      arguments: toolCall.function?.arguments || '',
-                    },
-                  };
-                } else {
-                  // Accumulate function arguments
-                  if (toolCall.function?.arguments) {
-                    toolCalls[index].function.arguments += toolCall.function.arguments;
-                  }
-                }
-              }
-            }
-
-            // Extract content from the delta
-            const content = delta?.content;
-
-            if (content) {
-              onChunk(content);
-            }
-          } catch (e) {
-            console.error('Error parsing SSE data:', e, jsonStr);
-          }
-        }
-      }
-    }
+    onComplete();
   } catch (error) {
     console.error('Streaming error:', error);
     onError(error instanceof Error ? error.message : 'Unknown streaming error');

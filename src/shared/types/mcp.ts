@@ -73,9 +73,15 @@ export interface MCPToolResult {
 }
 
 /**
+ * Tool calling mode
+ */
+export type ToolCallingMode = 'native' | 'prompt';
+
+/**
  * MCP Settings in settings store
  */
 export interface MCPSettings {
   servers: MCPServer[];
   enabledByDefault: boolean;
+  toolCallingMode?: ToolCallingMode; // How to call tools: 'native' (API tools param) or 'prompt' (system prompt + regex)
 }

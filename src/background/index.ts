@@ -6,6 +6,55 @@ import { MessageType } from '@/shared/types/messages';
 import type { SendChatMessage } from '@/shared/types/messages';
 import { mcpService } from './mcpService';
 
+console.log('Background service worker started');
+
+/**
+ * Connect to enabled MCP servers from settings
+ */
+async function connectMCPServers() {
+  try {
+    const settings = await getSettings();
+    if (!settings?.mcp?.servers) {
+      console.log('[MCP] No servers configured');
+      return;
+    }
+
+    const enabledServers = settings.mcp.servers.filter((s) => s.enabled);
+    console.log(`[MCP] Connecting to ${enabledServers.length} enabled MCP servers...`);
+
+    if (enabledServers.length === 0) {
+      console.log('[MCP] No enabled servers to connect');
+      return;
+    }
+
+    for (const server of enabledServers) {
+      try {
+        console.log(`[MCP] Connecting to ${server.name} (${server.url})...`);
+        const state = await mcpService.connectServer(server);
+        console.log(`[MCP] ✓ Connected to ${server.name}:`, {
+          status: state.status,
+          toolCount: state.tools.length,
+          tools: state.tools.map(t => t.name),
+        });
+      } catch (error) {
+        console.error(`[MCP] ✗ Failed to connect to ${server.name}:`, error);
+      }
+    }
+
+    // Log final state
+    const allTools = mcpService.getAllTools();
+    console.log(`[MCP] Total tools available: ${allTools.length}`, allTools.map(t => t.name));
+  } catch (error) {
+    console.error('[MCP] Error connecting to MCP servers:', error);
+  }
+}
+
+// Initialize MCP servers immediately when service worker loads
+(async () => {
+  console.log('[MCP] Initializing MCP servers on service worker load...');
+  await connectMCPServers();
+})();
+
 // Set up message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Handle message asynchronously
@@ -48,37 +97,11 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-// Initialize MCP servers on startup
+// Initialize MCP servers on browser startup (less common)
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('Extension starting up, connecting to MCP servers...');
+  console.log('[MCP] Browser starting up, connecting to MCP servers...');
   await connectMCPServers();
 });
-
-/**
- * Connect to enabled MCP servers from settings
- */
-async function connectMCPServers() {
-  try {
-    const settings = await getSettings();
-    if (!settings?.mcp?.servers) {
-      return;
-    }
-
-    const enabledServers = settings.mcp.servers.filter((s) => s.enabled);
-    console.log(`Connecting to ${enabledServers.length} enabled MCP servers...`);
-
-    for (const server of enabledServers) {
-      try {
-        const state = await mcpService.connectServer(server);
-        console.log(`Connected to MCP server ${server.name}:`, state);
-      } catch (error) {
-        console.error(`Failed to connect to MCP server ${server.name}:`, error);
-      }
-    }
-  } catch (error) {
-    console.error('Error connecting to MCP servers:', error);
-  }
-}
 
 // Handle long-lived connections for streaming
 chrome.runtime.onConnect.addListener((port) => {

@@ -36,6 +36,9 @@ export function useChat() {
       return;
     }
 
+    // Calculate the index BEFORE adding messages
+    const currentMessageCount = currentSession.messages.length;
+
     // Add user message
     const userChatMessage: ChatMessage = {
       role: 'user',
@@ -57,11 +60,13 @@ export function useChat() {
     setError(null);
 
     try {
-      await streamResponse(currentSession.messages.length);
+      // Pass the index of the assistant message we just added
+      // It should be: currentMessageCount (previous length) + 1 (user message) = index of assistant message
+      await streamResponse(currentMessageCount + 1);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
       setError(errorMessage);
-      setMessageError(currentSession.messages.length + 1, errorMessage);
+      setMessageError(currentMessageCount + 1, errorMessage);
       console.error('Error sending message:', err);
       setLoading(false);
     }

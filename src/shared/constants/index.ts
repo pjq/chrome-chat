@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: LLMSettings = {
   mcp: {
     servers: [],
     enabledByDefault: true,
+    toolCallingMode: 'prompt', // Use prompt-based tool calling by default for better compatibility
   },
 };
 
