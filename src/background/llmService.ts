@@ -23,7 +23,7 @@ function formatMCPToolsForOpenAI() {
 
 /**
  * Format MCP tools as system prompt text (alternative to native function calling)
- * Uses a concise format to avoid overwhelming the context
+ * Provides detailed descriptions to help LLM understand when and how to use tools
  */
 function formatMCPToolsForSystemPrompt(): string {
   const mcpTools = mcpService.getAllTools();
@@ -32,32 +32,65 @@ function formatMCPToolsForSystemPrompt(): string {
     return '';
   }
 
-  // Concise tool list
+  // Detailed tool list with all parameters
   const toolDescriptions = mcpTools.map((tool) => {
     const params = tool.inputSchema.properties || {};
     const required = tool.inputSchema.required || [];
 
-    // Only show required params for brevity
-    const requiredParams = required.map(name => {
-      const schema = params[name] as any;
-      return `${name}: ${schema?.description || schema?.type || 'string'}`;
-    }).join(', ');
+    // Show ALL parameters with detailed info
+    const paramsList = Object.entries(params).map(([name, schema]: [string, any]) => {
+      const isRequired = required.includes(name);
+      const type = schema.type || 'string';
+      const desc = schema.description || '';
+      const enumValues = schema.enum ? ` (options: ${schema.enum.join(', ')})` : '';
+      return `  - ${name} (${type}${isRequired ? ', required' : ', optional'}): ${desc}${enumValues}`;
+    }).join('\n');
 
-    return `- ${tool.name}(${requiredParams || 'no params'}): ${tool.description}`;
-  }).join('\n');
+    return `### ${tool.name}
+Server: ${tool.serverId}
+Description: ${tool.description}
+Parameters:
+${paramsList || '  (no parameters)'}`;
+  }).join('\n\n');
 
   return `
 
-## Tools Available
+## 🔧 Available Tools
 
-When you need to use a tool, use this XML format:
+**CRITICAL INSTRUCTIONS:**
+1. When a user question can be answered using these tools, USE THEM IMMEDIATELY
+2. DO NOT ask clarifying questions - make reasonable assumptions and use the tools
+3. You can call multiple tools in one response
+4. After getting tool results, you can call more tools if needed
+
+**Tool Call Format (use this exact XML structure):**
+\`\`\`xml
 <tool_call>
-<server_id>${mcpTools[0]?.serverId}</server_id>
-<tool_name>tool_name</tool_name>
-<arguments>{"param": "value"}</arguments>
+<server_id>SERVER_ID_HERE</server_id>
+<tool_name>TOOL_NAME_HERE</tool_name>
+<arguments>{"param_name": "value"}</arguments>
 </tool_call>
+\`\`\`
 
-${toolDescriptions}`;
+**Example:**
+If user asks about weather, immediately call:
+\`\`\`xml
+<tool_call>
+<server_id>mcp-123456789</server_id>
+<tool_name>get_weather</tool_name>
+<arguments>{"city": "Shanghai"}</arguments>
+</tool_call>
+\`\`\`
+
+---
+
+## 📋 Tool Directory
+
+${toolDescriptions}
+
+---
+
+**Remember:** Match user intent to tool names and descriptions. Use tools proactively!`;
 }
 
 /**
@@ -538,37 +571,50 @@ export async function streamChatMessage(
         await processStreamingResponse(response, onChunk, false);
       }
     } else {
-      // Prompt-based tool calling mode
-      // Filter out <tool_call> XML from display
-      const { contentBeforeToolCalls } = await processStreamingResponse(response, onChunk, true);
+      // Prompt-based tool calling mode with iterative tool execution
+      let conversationMessages = [...openAIRequest.messages];
+      let maxIterations = 5; // Prevent infinite loops
+      let iteration = 0;
 
-      // Parse tool calls from the text response
-      const promptToolCalls = parseToolCallsFromText(contentBeforeToolCalls);
+      while (iteration < maxIterations) {
+        iteration++;
 
-      console.log(`[LLM] Parsed ${promptToolCalls.length} tool calls from text`);
+        // Filter out <tool_call> XML from display
+        const { contentBeforeToolCalls } = await processStreamingResponse(response, onChunk, true);
 
-      if (promptToolCalls.length > 0) {
+        // Parse tool calls from the text response
+        const promptToolCalls = parseToolCallsFromText(contentBeforeToolCalls);
+
+        console.log(`[LLM] Iteration ${iteration}: Parsed ${promptToolCalls.length} tool calls from text`);
+
+        if (promptToolCalls.length === 0) {
+          // No more tool calls, we're done
+          break;
+        }
+
         // Execute the tools
         const toolResultsText = await executePromptBasedToolCalls(promptToolCalls, onChunk);
 
-        // Prepare messages for second request with tool results
-        const followUpMessages = [
-          ...openAIRequest.messages,
+        // Add assistant's response and tool results to conversation
+        conversationMessages = [
+          ...conversationMessages,
           {
             role: 'assistant',
             content: contentBeforeToolCalls, // Keep original response with tool calls for LLM
           },
           {
             role: 'user',
-            content: toolResultsText + '\n\nPlease provide a natural, human-friendly response based on the tool results above.',
+            content: toolResultsText + (iteration < maxIterations - 1
+              ? '\n\nIf you need more information, use additional tools. Otherwise, provide a natural, human-friendly response based on the tool results above.'
+              : '\n\nPlease provide a natural, human-friendly response based on the tool results above.'),
           },
         ];
 
-        console.log('[LLM] Making follow-up request with tool results (prompt mode)...');
+        console.log(`[LLM] Making follow-up request ${iteration} with tool results (prompt mode)...`);
 
         const followUpRequest = {
           model: settings.model,
-          messages: followUpMessages,
+          messages: conversationMessages,
           stream: true,
         };
 
@@ -583,8 +629,7 @@ export async function streamChatMessage(
           throw new Error(`API error: ${response.status} - ${errorText}`);
         }
 
-        // Process the follow-up response (don't filter, it's the natural language answer)
-        await processStreamingResponse(response, onChunk, false);
+        // Continue the loop to check for more tool calls in the response
       }
     }
 

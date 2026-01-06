@@ -4,6 +4,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type {
   MCPServer,
@@ -20,70 +21,64 @@ import type {
 class MCPService {
   private clients: Map<string, Client> = new Map();
   private serverStates: Map<string, MCPServerState> = new Map();
+  private serverConfigs: Map<string, MCPServer> = new Map(); // Store server configs for timeout lookup
 
   /**
    * Connect to an MCP server
    */
   async connectServer(server: MCPServer): Promise<MCPServerState> {
+    // Store server config for later use (e.g., timeout lookup)
+    this.serverConfigs.set(server.id, server);
+
+    // Prepare custom headers from server config
+    const customHeaders: Record<string, string> = {};
+    if (server.headers) {
+      Object.entries(server.headers).forEach(([key, value]) => {
+        customHeaders[key] = value;
+      });
+    }
+
+    // Determine transport type
+    const transportType = server.transportType || 'auto';
+
+    // Auto-detect: URLs containing '/sse' are likely SSE-only servers
+    const likelySSE = server.url.includes('/sse');
+
+    // Decide which transport to try first
+    let tryStreamableHttpFirst = true;
+    if (transportType === 'sse') {
+      tryStreamableHttpFirst = false;
+    } else if (transportType === 'auto' && likelySSE) {
+      tryStreamableHttpFirst = false;
+    } else if (transportType === 'streamableHttp') {
+      tryStreamableHttpFirst = true;
+    }
+
+    // Try connecting with appropriate transport
     try {
-      // Update status to connecting
-      this.updateServerState(server.id, { status: 'connecting' });
-
-      // Create SSE transport for remote server
-      const transport = new SSEClientTransport(new URL(server.url));
-
-      // Create MCP client
-      const client = new Client(
-        {
-          name: 'chat-with-pages',
-          version: '1.0.0',
-        },
-        {
-          capabilities: {},
+      if (tryStreamableHttpFirst) {
+        // Try StreamableHTTP first
+        try {
+          return await this.connectWithTransport(server, 'streamableHttp', customHeaders);
+        } catch (error) {
+          console.log(`[MCP] StreamableHTTP failed for ${server.name}, trying SSE transport:`, error);
+          // Fall back to SSE
+          return await this.connectWithTransport(server, 'sse', customHeaders);
         }
-      );
-
-      // Connect client to transport
-      await client.connect(transport);
-
-      // Store client
-      this.clients.set(server.id, client);
-
-      // List available tools and resources
-      const [toolsResult, resourcesResult] = await Promise.all([
-        client.listTools().catch(() => ({ tools: [] })),
-        client.listResources().catch(() => ({ resources: [] })),
-      ]);
-
-      const tools: MCPTool[] = toolsResult.tools.map((tool: any) => ({
-        name: tool.name,
-        description: tool.description || '',
-        inputSchema: tool.inputSchema,
-      }));
-
-      const resources: MCPResource[] = resourcesResult.resources.map((resource: any) => ({
-        uri: resource.uri,
-        name: resource.name,
-        description: resource.description,
-        mimeType: resource.mimeType,
-      }));
-
-      // Update server state
-      const state: MCPServerState = {
-        serverId: server.id,
-        status: 'connected',
-        tools,
-        resources,
-        lastConnected: Date.now(),
-      };
-
-      this.serverStates.set(server.id, state);
-      console.log(`[MCP] Connected to server: ${server.name}`, state);
-
-      return state;
+      } else {
+        // Try SSE first
+        try {
+          return await this.connectWithTransport(server, 'sse', customHeaders);
+        } catch (error) {
+          console.log(`[MCP] SSE failed for ${server.name}, trying StreamableHTTP transport:`, error);
+          // Fall back to StreamableHTTP
+          return await this.connectWithTransport(server, 'streamableHttp', customHeaders);
+        }
+      }
     } catch (error) {
+      // Both transports failed
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`[MCP] Failed to connect to ${server.name}:`, error);
+      console.error(`[MCP] All transports failed for ${server.name}:`, error);
 
       const errorState: MCPServerState = {
         serverId: server.id,
@@ -99,6 +94,83 @@ class MCPService {
   }
 
   /**
+   * Connect with specific transport type
+   */
+  private async connectWithTransport(
+    server: MCPServer,
+    transportType: 'streamableHttp' | 'sse',
+    customHeaders: Record<string, string>
+  ): Promise<MCPServerState> {
+    // Update status to connecting
+    this.updateServerState(server.id, { status: 'connecting' });
+
+    // Create transport based on type
+    const transport = transportType === 'streamableHttp'
+      ? new StreamableHTTPClientTransport(new URL(server.url), {
+          requestInit: {
+            headers: customHeaders,
+          },
+        })
+      : new SSEClientTransport(new URL(server.url), {
+          requestInit: {
+            headers: customHeaders,
+          },
+        });
+
+    console.log(`[MCP] Using ${transportType} transport for ${server.name}`);
+
+    // Create MCP client
+    const client = new Client(
+      {
+        name: 'chat-with-pages',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      }
+    );
+
+    // Connect client to transport (let errors propagate for fallback)
+    await client.connect(transport);
+
+    // Store client
+    this.clients.set(server.id, client);
+
+    // List available tools and resources
+    const [toolsResult, resourcesResult] = await Promise.all([
+      client.listTools().catch(() => ({ tools: [] })),
+      client.listResources().catch(() => ({ resources: [] })),
+    ]);
+
+    const tools: MCPTool[] = toolsResult.tools.map((tool: any) => ({
+      name: tool.name,
+      description: tool.description || '',
+      inputSchema: tool.inputSchema,
+    }));
+
+    const resources: MCPResource[] = resourcesResult.resources.map((resource: any) => ({
+      uri: resource.uri,
+      name: resource.name,
+      description: resource.description,
+      mimeType: resource.mimeType,
+    }));
+
+    // Update server state
+    const state: MCPServerState = {
+      serverId: server.id,
+      status: 'connected',
+      tools,
+      resources,
+      lastConnected: Date.now(),
+    };
+
+    this.serverStates.set(server.id, state);
+    console.log(`[MCP] Connected to server: ${server.name}`, state);
+
+    return state;
+  }
+
+  /**
    * Disconnect from an MCP server
    */
   async disconnectServer(serverId: string): Promise<void> {
@@ -111,6 +183,9 @@ class MCPService {
       }
       this.clients.delete(serverId);
     }
+
+    // Clean up server config
+    this.serverConfigs.delete(serverId);
 
     this.updateServerState(serverId, { status: 'disconnected' });
   }
@@ -130,10 +205,25 @@ class MCPService {
     try {
       console.log(`[MCP] Calling tool ${toolCall.toolName} on ${toolCall.serverId}`, toolCall.arguments);
 
-      const result = await client.callTool({
-        name: toolCall.toolName,
-        arguments: toolCall.arguments,
+      // Get timeout from server config (default: 30 seconds)
+      const serverConfig = this.serverConfigs.get(toolCall.serverId);
+      const timeoutMs = serverConfig?.timeout || 30000;
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Tool call timeout after ${timeoutMs / 1000} seconds`));
+        }, timeoutMs);
       });
+
+      // Race between tool call and timeout
+      const result = await Promise.race([
+        client.callTool({
+          name: toolCall.toolName,
+          arguments: toolCall.arguments,
+        }),
+        timeoutPromise,
+      ]);
 
       console.log(`[MCP] Tool ${toolCall.toolName} result:`, result);
 

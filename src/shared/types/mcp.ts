@@ -3,6 +3,11 @@
  */
 
 /**
+ * MCP transport type
+ */
+export type MCPTransportType = 'auto' | 'streamableHttp' | 'sse';
+
+/**
  * MCP Server configuration
  */
 export interface MCPServer {
@@ -12,6 +17,8 @@ export interface MCPServer {
   enabled: boolean;
   description?: string;
   headers?: Record<string, string>; // Custom headers (e.g., auth tokens)
+  transportType?: MCPTransportType; // Transport protocol (default: 'auto')
+  timeout?: number; // Tool call timeout in milliseconds (default: 30000)
 }
 
 /**
