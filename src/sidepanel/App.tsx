@@ -195,7 +195,8 @@ function App() {
         isRefreshing={isExtracting}
       />
 
-      {isExtracting && !currentSession && (
+      {/* Show loading state when extracting */}
+      {isExtracting && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Spinner size="lg" />
@@ -207,11 +208,11 @@ function App() {
       {/* Silently handle extraction errors - chat still works without page content */}
 
       {/* Always show chat interface structure */}
-      <div className="flex-1 overflow-hidden">
-        {currentSession ? (
-          <ChatInterface />
-        ) : (
-          !isExtracting && (
+      {!isExtracting && (
+        <div className="flex-1 overflow-hidden">
+          {currentSession ? (
+            <ChatInterface />
+          ) : (
             <div className="h-full flex flex-col">
               <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center max-w-md">
@@ -245,9 +246,9 @@ function App() {
                 disabled={isExtracting}
               />
             </div>
-          )
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {currentSession?.content && <MarkdownDownload />}
 
