@@ -204,46 +204,14 @@ function App() {
         </div>
       )}
 
-      {error && !currentSession && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <div className="flex items-start mb-3">
-              <svg className="w-6 h-6 text-red-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <h3 className="text-lg font-semibold text-red-800 mb-2">
-                  Couldn't read this page
-                </h3>
-                <p className="text-sm text-red-700 mb-3">{error}</p>
-              </div>
-            </div>
-
-            <div className="bg-white border border-red-200 rounded p-3 mb-4 text-xs text-gray-700">
-              <p className="font-semibold mb-2">Try this:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Make sure you're on a regular webpage</li>
-                <li>Refresh the page and try again</li>
-                <li>Check if the page has finished loading</li>
-              </ul>
-            </div>
-
-            <button
-              onClick={handleRefresh}
-              className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Silently handle extraction errors - chat still works without page content */}
 
       {/* Always show chat interface structure */}
       <div className="flex-1 overflow-hidden">
         {currentSession ? (
           <ChatInterface />
         ) : (
-          !isExtracting && !error && (
+          !isExtracting && (
             <div className="h-full flex flex-col">
               <div className="flex-1 flex items-center justify-center p-4">
                 <div className="text-center max-w-md">
@@ -256,7 +224,9 @@ function App() {
                     Ready to chat!
                   </h2>
                   <p className="text-gray-600 mb-4">
-                    {isValidPage
+                    {error
+                      ? 'Couldn\'t read this page, but you can still chat as a general assistant.'
+                      : isValidPage
                       ? 'Click refresh to load the current page content, or just start chatting!'
                       : 'Start chatting or navigate to a webpage to chat about its content.'}
                   </p>
@@ -264,10 +234,10 @@ function App() {
               </div>
               {/* Show input even without session */}
               <ChatInput
-                onSend={async (message, images) => {
+                onSend={(message, images) => {
                   // If no session, create one first (with or without content)
                   if (!currentSession) {
-                    await createSession(content || null, currentTabId || undefined);
+                    createSession(content || null, currentTabId || undefined);
                   }
                   // Send the message
                   sendMessage(message, images);
