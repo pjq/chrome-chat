@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent, ClipboardEvent, useRef } from 'react';
+import { useState, KeyboardEvent, ClipboardEvent, useRef, useEffect } from 'react';
 import { Button } from '../common/Button';
 import type { ImageAttachment } from '@/shared/types/llm';
 
@@ -7,16 +7,38 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
+const MIN_ROWS = 2;
+const MAX_ROWS = 10;
+
 export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [rows, setRows] = useState(MIN_ROWS);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow textarea based on content
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to get accurate scrollHeight
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const lineHeight = 24; // Approximate line height in pixels
+
+      // Calculate number of rows
+      const calculatedRows = Math.ceil(scrollHeight / lineHeight);
+      const newRows = Math.max(MIN_ROWS, Math.min(calculatedRows, MAX_ROWS));
+
+      setRows(newRows);
+    }
+  }, [message]);
 
   const handleSend = () => {
     if ((message.trim() || images.length > 0) && !disabled) {
       onSend(message, images.length > 0 ? images : undefined);
       setMessage('');
       setImages([]);
+      setRows(MIN_ROWS); // Reset to minimum rows after sending
     }
   };
 
@@ -132,14 +154,16 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
           </svg>
         </button>
         <textarea
+          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder="Ask a question or paste an image..."
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-          rows={2}
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none overflow-y-auto"
+          rows={rows}
           disabled={disabled}
+          style={{ maxHeight: `${MAX_ROWS * 24}px` }}
         />
         <Button
           onClick={handleSend}
