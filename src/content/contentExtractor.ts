@@ -129,6 +129,47 @@ export function extractBasicContent(): ExtractedContent {
     }
   });
 
+  // Extract form field values (textareas, inputs) as they may contain important content
+  const formData: string[] = [];
+
+  // Get textarea values
+  contentElement.querySelectorAll('textarea').forEach(textarea => {
+    const value = (textarea as HTMLTextAreaElement).value.trim();
+    if (value.length > 10) {
+      const label = textarea.getAttribute('aria-label') ||
+                    textarea.getAttribute('placeholder') ||
+                    textarea.getAttribute('name') ||
+                    'Form content';
+      formData.push(`\n**${label}:**\n${value}\n`);
+    }
+  });
+
+  // Get input field values (text, email, etc.)
+  contentElement.querySelectorAll('input[type="text"], input[type="email"], input[type="url"], input:not([type])').forEach(input => {
+    const value = (input as HTMLInputElement).value.trim();
+    if (value.length > 2) {
+      const label = input.getAttribute('aria-label') ||
+                    input.getAttribute('placeholder') ||
+                    input.getAttribute('name') ||
+                    'Field';
+      formData.push(`**${label}:** ${value}`);
+    }
+  });
+
+  // Get select dropdown values
+  contentElement.querySelectorAll('select').forEach(select => {
+    const selectedOption = (select as HTMLSelectElement).selectedOptions[0];
+    if (selectedOption) {
+      const value = selectedOption.textContent?.trim();
+      if (value && value.length > 0) {
+        const label = select.getAttribute('aria-label') ||
+                      select.getAttribute('name') ||
+                      'Selection';
+        formData.push(`**${label}:** ${value}`);
+      }
+    }
+  });
+
   // Get text content from cleaned element
   let textContent = clone.textContent || '';
 
@@ -140,6 +181,11 @@ export function extractBasicContent(): ExtractedContent {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // Append form data if any
+  if (formData.length > 0) {
+    textContent += '\n\n## Form Content\n\n' + formData.join('\n');
+  }
 
   const cleanedHTML = clone.innerHTML;
 
