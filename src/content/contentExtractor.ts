@@ -132,39 +132,106 @@ export function extractBasicContent(): ExtractedContent {
   // Extract form field values (textareas, inputs) as they may contain important content
   const formData: string[] = [];
 
-  // Get textarea values
-  contentElement.querySelectorAll('textarea').forEach(textarea => {
+  // Get textarea values - use document instead of contentElement to ensure we catch all textareas
+  document.querySelectorAll('textarea').forEach(textarea => {
     const value = (textarea as HTMLTextAreaElement).value.trim();
-    if (value.length > 10) {
-      const label = textarea.getAttribute('aria-label') ||
-                    textarea.getAttribute('placeholder') ||
-                    textarea.getAttribute('name') ||
-                    'Form content';
+    if (value.length > 5) {  // Lowered threshold
+      // Try multiple ways to find a label
+      let label = '';
+
+      // Method 1: Check for associated label element
+      const id = textarea.getAttribute('id');
+      if (id) {
+        const labelElement = document.querySelector(`label[for="${id}"]`);
+        if (labelElement) {
+          label = labelElement.textContent?.trim() || '';
+        }
+      }
+
+      // Method 2: Check for label in parent elements
+      if (!label) {
+        let parent = textarea.parentElement;
+        let depth = 0;
+        while (parent && depth < 3) {
+          const labelInParent = parent.querySelector('label');
+          if (labelInParent) {
+            label = labelInParent.textContent?.trim() || '';
+            break;
+          }
+          parent = parent.parentElement;
+          depth++;
+        }
+      }
+
+      // Method 3: Use attributes
+      if (!label) {
+        label = textarea.getAttribute('aria-label') ||
+                textarea.getAttribute('placeholder') ||
+                textarea.getAttribute('name') ||
+                textarea.getAttribute('title') ||
+                '';
+      }
+
+      // Remove asterisk and clean up label
+      label = label.replace(/[*＊]/g, '').trim() || 'Description';
+
+      console.log('[Content Extraction] Found textarea:', label, 'Value length:', value.length);
       formData.push(`\n**${label}:**\n${value}\n`);
     }
   });
 
   // Get input field values (text, email, etc.)
-  contentElement.querySelectorAll('input[type="text"], input[type="email"], input[type="url"], input:not([type])').forEach(input => {
+  document.querySelectorAll('input[type="text"], input[type="email"], input[type="url"], input:not([type])').forEach(input => {
     const value = (input as HTMLInputElement).value.trim();
     if (value.length > 2) {
-      const label = input.getAttribute('aria-label') ||
-                    input.getAttribute('placeholder') ||
-                    input.getAttribute('name') ||
-                    'Field';
+      // Try to find label similar to textarea
+      let label = '';
+      const id = input.getAttribute('id');
+      if (id) {
+        const labelElement = document.querySelector(`label[for="${id}"]`);
+        if (labelElement) {
+          label = labelElement.textContent?.trim() || '';
+        }
+      }
+
+      if (!label) {
+        label = input.getAttribute('aria-label') ||
+                input.getAttribute('placeholder') ||
+                input.getAttribute('name') ||
+                input.getAttribute('title') ||
+                'Field';
+      }
+
+      label = label.replace(/[*＊]/g, '').trim();
+      console.log('[Content Extraction] Found input:', label, 'Value:', value.substring(0, 50));
       formData.push(`**${label}:** ${value}`);
     }
   });
 
   // Get select dropdown values
-  contentElement.querySelectorAll('select').forEach(select => {
+  document.querySelectorAll('select').forEach(select => {
     const selectedOption = (select as HTMLSelectElement).selectedOptions[0];
     if (selectedOption) {
       const value = selectedOption.textContent?.trim();
       if (value && value.length > 0) {
-        const label = select.getAttribute('aria-label') ||
-                      select.getAttribute('name') ||
-                      'Selection';
+        // Try to find label
+        let label = '';
+        const id = select.getAttribute('id');
+        if (id) {
+          const labelElement = document.querySelector(`label[for="${id}"]`);
+          if (labelElement) {
+            label = labelElement.textContent?.trim() || '';
+          }
+        }
+
+        if (!label) {
+          label = select.getAttribute('aria-label') ||
+                  select.getAttribute('name') ||
+                  'Selection';
+        }
+
+        label = label.replace(/[*＊]/g, '').trim();
+        console.log('[Content Extraction] Found select:', label, 'Value:', value);
         formData.push(`**${label}:** ${value}`);
       }
     }
@@ -184,7 +251,10 @@ export function extractBasicContent(): ExtractedContent {
 
   // Append form data if any
   if (formData.length > 0) {
+    console.log('[Content Extraction] Adding', formData.length, 'form fields to content');
     textContent += '\n\n## Form Content\n\n' + formData.join('\n');
+  } else {
+    console.warn('[Content Extraction] No form fields found');
   }
 
   const cleanedHTML = clone.innerHTML;
