@@ -58,62 +58,110 @@ export function extractBasicContent(): ExtractedContent {
     '[role="main"]',
     '#content',
     '#main',
+    '#main-content',
     '.main-content',
+    '.content',
     'article',
+    '.article',
+    '.post-content',
+    '.entry-content',
     '.markdown-body', // GitHub markdown content
     '.repository-content', // GitHub repo content
     '.container-xl', // GitHub container
+    '[data-content]',
+    '.docs-content', // Documentation sites
   ];
 
   let mainElement: Element | null = null;
   for (const selector of mainSelectors) {
-    mainElement = document.querySelector(selector);
-    if (mainElement) break;
+    const element = document.querySelector(selector);
+    if (element && element.textContent && element.textContent.trim().length > 200) {
+      mainElement = element;
+      break;
+    }
   }
 
   // Fall back to body if no main content found
   const contentElement = mainElement || document.body;
 
-  // Get clean text content
-  let textContent = contentElement.textContent || '';
-
-  // Clean up excessive whitespace
-  textContent = textContent
-    .replace(/\s+/g, ' ')
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .trim();
-
-  // Try to remove navigation and common UI elements
+  // Clone the element for manipulation
   const clone = contentElement.cloneNode(true) as Element;
 
   // Remove common non-content elements
   const selectorsToRemove = [
     'nav',
-    'header:not(.markdown-header)',
-    'footer',
+    'header:not([class*="content"]):not([class*="article"])',
+    'footer:not([class*="content"])',
     '.navigation',
+    '.navbar',
+    '.nav',
     '.sidebar',
+    '.side-bar',
+    '.menu',
     '.advertisement',
+    '.ad',
+    '.ads',
+    '.banner:not([class*="content"])',
     '[role="navigation"]',
-    '[role="banner"]',
+    '[role="banner"]:not([class*="content"])',
     '[role="contentinfo"]',
+    '[role="complementary"]',
     'script',
     'style',
     'noscript',
+    'iframe',
+    '.cookie-banner',
+    '.cookie-notice',
+    '#cookie-notice',
   ];
 
   selectorsToRemove.forEach(selector => {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
+    try {
+      clone.querySelectorAll(selector).forEach(el => {
+        // Don't remove if it contains significant content
+        const text = el.textContent?.trim() || '';
+        if (text.length < 100) {
+          el.remove();
+        }
+      });
+    } catch (e) {
+      // Ignore selector errors
+    }
   });
 
+  // Get text content from cleaned element
+  let textContent = clone.textContent || '';
+
+  // Clean up excessive whitespace while preserving structure
+  textContent = textContent
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
   const cleanedHTML = clone.innerHTML;
+
+  // If we still don't have much content, try to get all visible text
+  if (textContent.length < 500) {
+    console.warn('[Content Extraction] Extracted content is short, trying full body text');
+    textContent = document.body.innerText || document.body.textContent || '';
+    textContent = textContent
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
 
   return {
     title: document.title,
     content: cleanedHTML,
     textContent: textContent,
     length: textContent.length,
-    excerpt: textContent.slice(0, 300).trim() + '...',
+    excerpt: textContent.slice(0, 300).trim() + (textContent.length > 300 ? '...' : ''),
     url: window.location.href,
     siteName: getSiteName(),
   };
