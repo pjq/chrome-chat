@@ -120,6 +120,18 @@ export function MCPSettings() {
           const isConnecting = state?.status === 'connecting';
           const hasError = state?.status === 'error';
 
+          // Debug logging
+          if (server.enabled) {
+            console.log(`[MCPSettings] Server "${server.name}":`, {
+              id: server.id,
+              status: state?.status,
+              isConnected,
+              toolCount: state?.tools?.length || 0,
+              tools: state?.tools,
+              state: state,
+            });
+          }
+
           return (
             <div
               key={server.id}
@@ -177,6 +189,16 @@ export function MCPSettings() {
                 {/* Error Message */}
                 {hasError && state?.error && (
                   <p className="text-xs text-red-600 mt-1">Error: {state.error}</p>
+                )}
+
+                {/* Debug: Show state info when connected */}
+                {isConnected && state && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs font-mono">
+                    <div>Status: {state.status}</div>
+                    <div>Tools array exists: {state.tools ? 'Yes' : 'No'}</div>
+                    <div>Tools length: {state.tools?.length || 0}</div>
+                    <div>Tools: {JSON.stringify(state.tools?.map(t => t.name) || [])}</div>
+                  </div>
                 )}
 
                 {/* Connected Tools List */}

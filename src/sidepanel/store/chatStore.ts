@@ -70,6 +70,7 @@ interface ChatState {
   clearCurrentSession: () => void;
   deleteSession: (sessionId: string) => void;
   deleteOldestSessions: (count: number) => void;
+  clearAllSessions: () => void;
   getCurrentSession: () => ChatSession | null;
 
   // Message management
@@ -197,6 +198,18 @@ export const useChatStore = create<ChatState>()(
             currentSessionId: newCurrentId,
           };
         });
+      },
+
+      /**
+       * Clear all chat sessions
+       */
+      clearAllSessions: () => {
+        set({
+          sessions: [],
+          currentSessionId: null,
+          error: null,
+        });
+        console.log('[Storage] Cleared all chat sessions');
       },
 
       /**

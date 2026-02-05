@@ -67,7 +67,20 @@ export function usePageContent() {
           throw new Error('No content extracted from page');
         }
 
-        setContentState(response.content);
+        // Check if content is essentially empty
+        const content = response.content;
+        const textLength = content.textContent?.trim().length || 0;
+
+        if (textLength < 100) {
+          throw new Error(
+            'Very little content was found on this page. Try:\n' +
+            '• Refresh the page and try again\n' +
+            '• Wait for the page to fully load\n' +
+            '• This page may not have readable content'
+          );
+        }
+
+        setContentState(content);
       } catch (err) {
         // If connection error and we haven't retried too many times, inject and retry
         const errorMsg = err instanceof Error ? err.message : String(err);

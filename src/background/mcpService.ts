@@ -138,9 +138,18 @@ class MCPService {
 
     // List available tools and resources
     const [toolsResult, resourcesResult] = await Promise.all([
-      client.listTools().catch(() => ({ tools: [] })),
-      client.listResources().catch(() => ({ resources: [] })),
+      client.listTools().catch((err) => {
+        console.error(`[MCP] Error listing tools from ${server.name}:`, err);
+        return { tools: [] };
+      }),
+      client.listResources().catch((err) => {
+        console.error(`[MCP] Error listing resources from ${server.name}:`, err);
+        return { resources: [] };
+      }),
     ]);
+
+    console.log(`[MCP] Tools result from ${server.name}:`, toolsResult);
+    console.log(`[MCP] Resources result from ${server.name}:`, resourcesResult);
 
     const tools: MCPTool[] = toolsResult.tools.map((tool: any) => ({
       name: tool.name,
