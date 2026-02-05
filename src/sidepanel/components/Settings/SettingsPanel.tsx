@@ -7,6 +7,7 @@ import { LLMProviderSettings } from './LLMProviderSettings';
 import { MCPSettings } from './MCPSettings';
 import { useSettings } from '../../hooks/useSettings';
 import { useChatStore } from '../../store/chatStore';
+import { useTranslation } from '@/i18n/useTranslation';
 import type { LLMProvider } from '@/shared/types/llm';
 
 interface SettingsPanelProps {
@@ -20,6 +21,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [hasChanges, setHasChanges] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     console.log('SettingsPanel: Loaded settings:', settings);
@@ -85,7 +87,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-indigo-600 text-white p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Settings</h2>
+          <h2 className="text-lg font-semibold">{t('components.settings.title')}</h2>
           <button
             onClick={handleCancel}
             className="text-white hover:text-indigo-200"
@@ -130,13 +132,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           />
 
           <TextArea
-            label="Instructions for AI"
+            label={t('components.settings.instructionsLabel')}
             value={formData.systemPrompt}
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, systemPrompt: e.target.value }))
             }
             rows={4}
-            placeholder="Tell the AI how you'd like it to respond..."
+            placeholder={t('components.settings.instructionsPlaceholder')}
           />
 
           {/* MCP Settings Section */}
@@ -146,9 +148,9 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
           {/* Cache Management Section */}
           <div className="border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Data Management</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('components.settings.dataManagement.title')}</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Manage cached data and application settings.
+              {t('components.settings.dataManagement.description')}
             </p>
 
             <div className="space-y-3">
@@ -156,18 +158,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               {!showClearConfirm ? (
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Chat History</p>
+                    <p className="text-sm font-medium text-gray-900">{t('components.settings.dataManagement.chatHistory.title')}</p>
                     <p className="text-xs text-gray-500">
-                      {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} stored
+                      {t('components.settings.dataManagement.chatHistory.sessionsCount', { count: sessions.length })}
                     </p>
                   </div>
                   <Button
                     variant="secondary"
                     onClick={handleClearCache}
                     className="bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200"
-                  >
-                    Clear Cache
-                  </Button>
+                    translationKey="components.button.clearCache"
+                  />
                 </div>
               ) : (
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
@@ -177,10 +178,10 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </svg>
                     <div className="flex-1">
                       <h4 className="text-sm font-semibold text-orange-900 mb-1">
-                        Clear chat history?
+                        {t('components.settings.dataManagement.chatHistory.confirmClear.title')}
                       </h4>
                       <p className="text-sm text-orange-700 mb-3">
-                        This will permanently delete all {sessions.length} chat {sessions.length === 1 ? 'session' : 'sessions'}. This action cannot be undone.
+                        {t('components.settings.dataManagement.chatHistory.confirmClear.message', { count: sessions.length })}
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -188,16 +189,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                           onClick={handleClearCache}
                           className="bg-orange-600 hover:bg-orange-700"
                           size="sm"
-                        >
-                          Yes, Clear History
-                        </Button>
+                          translationKey="components.button.yesClearHistory"
+                        />
                         <Button
                           variant="secondary"
                           onClick={handleCancelClear}
                           size="sm"
-                        >
-                          Cancel
-                        </Button>
+                          translationKey="components.button.cancel"
+                        />
                       </div>
                     </div>
                   </div>
@@ -208,18 +207,17 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
               {!showResetConfirm ? (
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Reset Application</p>
+                    <p className="text-sm font-medium text-gray-900">{t('components.settings.dataManagement.resetApp.title')}</p>
                     <p className="text-xs text-gray-500">
-                      Clear all data including settings and chat history
+                      {t('components.settings.dataManagement.resetApp.description')}
                     </p>
                   </div>
                   <Button
                     variant="secondary"
                     onClick={handleResetApp}
                     className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
-                  >
-                    Reset App
-                  </Button>
+                    translationKey="components.button.resetApp"
+                  />
                 </div>
               ) : (
                 <div className="p-4 bg-red-50 rounded-lg border border-red-200">
@@ -229,19 +227,19 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     </svg>
                     <div className="flex-1">
                       <h4 className="text-sm font-semibold text-red-900 mb-1">
-                        Reset entire application?
+                        {t('components.settings.dataManagement.resetApp.confirmClear.title')}
                       </h4>
                       <p className="text-sm text-red-700 mb-3">
-                        This will permanently delete ALL data including:
+                        {t('components.settings.dataManagement.resetApp.confirmClear.message')}
                       </p>
                       <ul className="text-sm text-red-700 mb-3 ml-4 list-disc space-y-1">
-                        <li>All chat sessions ({sessions.length} {sessions.length === 1 ? 'session' : 'sessions'})</li>
-                        <li>API keys and settings</li>
-                        <li>MCP server configurations</li>
-                        <li>All preferences</li>
+                        <li>{t('components.settings.dataManagement.resetApp.confirmClear.items.0', { count: sessions.length })}</li>
+                        <li>{t('components.settings.dataManagement.resetApp.confirmClear.items.1')}</li>
+                        <li>{t('components.settings.dataManagement.resetApp.confirmClear.items.2')}</li>
+                        <li>{t('components.settings.dataManagement.resetApp.confirmClear.items.3')}</li>
                       </ul>
                       <p className="text-sm font-semibold text-red-800 mb-3">
-                        The app will reload and reset to default state. This cannot be undone.
+                        {t('components.settings.dataManagement.resetApp.confirmClear.warning')}
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -249,16 +247,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                           onClick={handleResetApp}
                           className="bg-red-600 hover:bg-red-700"
                           size="sm"
-                        >
-                          Yes, Reset Everything
-                        </Button>
+                          translationKey="components.button.yesResetEverything"
+                        />
                         <Button
                           variant="secondary"
                           onClick={handleCancelReset}
                           size="sm"
-                        >
-                          Cancel
-                        </Button>
+                          translationKey="components.button.cancel"
+                        />
                       </div>
                     </div>
                   </div>
@@ -270,14 +266,14 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
         {/* Footer */}
         <div className="border-t border-gray-200 p-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={handleCancel}>
-            Cancel
+          <Button variant="secondary" onClick={handleCancel} translationKey="components.button.cancel">
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges || isLoading}
+            translationKey={isLoading ? undefined : "components.button.saveChanges"}
           >
-            {isLoading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? t('components.spinner.loading') : null}
           </Button>
         </div>
       </div>

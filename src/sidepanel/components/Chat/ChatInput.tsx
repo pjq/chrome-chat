@@ -1,5 +1,6 @@
 import { useState, KeyboardEvent, ClipboardEvent, useRef, useEffect } from 'react';
 import { Button } from '../common/Button';
+import { useTranslation } from '@/i18n/useTranslation';
 import type { ImageAttachment } from '@/shared/types/llm';
 
 interface ChatInputProps {
@@ -16,6 +17,7 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
   const [rows, setRows] = useState(MIN_ROWS);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { t } = useTranslation();
 
   // Auto-grow textarea based on content
   useEffect(() => {
@@ -159,7 +161,7 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder="Ask a question or paste an image..."
+          placeholder={t('components.chatInput.placeholder')}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none overflow-y-auto"
           rows={rows}
           disabled={disabled}
@@ -170,11 +172,11 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
           disabled={disabled || (!message.trim() && images.length === 0)}
           className="self-end"
         >
-          Send
+          {t('components.button.send')}
         </Button>
       </div>
       <p className="text-xs text-gray-500 mt-2">
-        Press Enter to send, Shift+Enter for new line. Paste or click 📷 to add images.
+        {t('components.chatInput.instructions')}
       </p>
     </div>
   );

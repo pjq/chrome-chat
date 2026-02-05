@@ -1,7 +1,10 @@
 
+import { useTranslation } from '@/i18n/useTranslation';
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger';
   size?: 'sm' | 'md' | 'lg';
+  translationKey?: string; // Optional translation key for the button text
 }
 
 export function Button({
@@ -9,9 +12,11 @@ export function Button({
   variant = 'primary',
   size = 'md',
   className = '',
+  translationKey,
   ...props
 }: ButtonProps) {
   const baseClasses = 'font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const { t } = useTranslation();
 
   const variantClasses = {
     primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500 disabled:bg-indigo-400',
@@ -25,12 +30,15 @@ export function Button({
     lg: 'px-6 py-3 text-lg',
   };
 
+  // If translationKey is provided, use the translated text instead of children
+  const buttonText = translationKey ? t(translationKey as any) : children;
+
   return (
     <button
       className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       {...props}
     >
-      {children}
+      {buttonText}
     </button>
   );
 }
