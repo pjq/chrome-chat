@@ -180,19 +180,62 @@ export function MCPSettings() {
                 )}
 
                 {/* Connected Tools List */}
-                {isConnected && state && state.tools.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                      Available tools ({state.tools.length})
+                {isConnected && state && state.tools && state.tools.length > 0 && (
+                  <details className="mt-3 pt-3 border-t border-gray-200">
+                    <summary className="cursor-pointer hover:text-gray-900 select-none">
+                      <div className="inline-flex items-center gap-2">
+                        <h5 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          Available Tools ({state.tools.length})
+                        </h5>
+                        <svg className="w-3 h-3 text-gray-500 transition-transform details-marker" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
                     </summary>
-                    <ul className="mt-1 ml-4 text-xs text-gray-600 space-y-0.5">
+                    <div className="space-y-2 mt-2">
                       {state.tools.map((tool) => (
-                        <li key={tool.name} className="truncate">
-                          • <code className="bg-gray-100 px-1 rounded">{tool.name}</code>
-                          {tool.description && <span className="text-gray-500"> - {tool.description}</span>}
-                        </li>
+                        <div key={tool.name} className="bg-gray-50 rounded p-2 border border-gray-200">
+                          <div className="flex items-start gap-2">
+                            <code className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                              {tool.name}
+                            </code>
+                          </div>
+                          {tool.description && (
+                            <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                              {tool.description}
+                            </p>
+                          )}
+                          {tool.inputSchema?.properties && Object.keys(tool.inputSchema.properties).length > 0 && (
+                            <details className="mt-2">
+                              <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 font-medium select-none">
+                                <span className="inline-flex items-center gap-1">
+                                  <svg className="w-3 h-3 transition-transform details-marker inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                  Parameters ({Object.keys(tool.inputSchema.properties).length})
+                                </span>
+                              </summary>
+                              <div className="mt-1 ml-2 space-y-1">
+                                {Object.entries(tool.inputSchema.properties).map(([paramName, paramSchema]: [string, any]) => (
+                                  <div key={paramName} className="text-xs">
+                                    <span className="font-mono text-gray-700">{paramName}</span>
+                                    {tool.inputSchema.required?.includes(paramName) && (
+                                      <span className="text-red-600 ml-1">*</span>
+                                    )}
+                                    <span className="text-gray-500 ml-1">
+                                      ({paramSchema.type || 'any'})
+                                    </span>
+                                    {paramSchema.description && (
+                                      <p className="text-gray-600 ml-2 mt-0.5">{paramSchema.description}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </details>
                 )}
               </div>

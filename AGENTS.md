@@ -14,6 +14,7 @@ This document provides context for AI assistants (like Claude) working on this C
 - Copy messages to clipboard
 - Markdown rendering with syntax highlighting
 - Export pages to markdown format
+- MCP (Model Context Protocol) server support for extending AI capabilities
 
 ## Architecture
 
@@ -24,17 +25,26 @@ This document provides context for AI assistants (like Claude) working on this C
 │   ├── background/          # Service worker
 │   │   ├── index.ts         # Message routing, port handling
 │   │   ├── llmService.ts    # Streaming API calls (SSE)
+│   │   ├── mcpService.ts    # MCP server connection & tool calling
 │   │   └── messageHandler.ts
 │   ├── content/             # Content scripts
 │   │   ├── index.ts         # Message listener
-│   │   └── contentExtractor.ts  # @mozilla/readability
+│   │   └── contentExtractor.ts  # @mozilla/readability + form extraction
 │   ├── sidepanel/           # React UI (main interface)
 │   │   ├── App.tsx
 │   │   ├── components/
+│   │   │   ├── Settings/
+│   │   │   │   ├── MCPSettings.tsx  # MCP server configuration UI
+│   │   │   │   └── ...
+│   │   │   └── ...
 │   │   ├── hooks/
+│   │   │   ├── useMCPServers.ts     # MCP server state management
+│   │   │   └── ...
 │   │   └── store/           # Zustand state management
 │   └── shared/              # Shared types and utils
 │       ├── types/
+│       │   ├── mcp.ts       # MCP server & tool types
+│       │   └── ...
 │       ├── constants/
 │       └── utils/
 └── public/
@@ -94,6 +104,11 @@ Stores LLM configuration:
 - model
 - systemPrompt
 
+**MCP Settings:**
+- servers: Array of MCP server configurations
+- enabledByDefault: Whether MCP tools are enabled by default
+- toolCallingMode: 'native' (API tools param) or 'prompt' (system prompt + regex parsing)
+
 ## Important Patterns
 
 ### 1. Chrome Extension Message Passing
@@ -148,6 +163,42 @@ interface ChatMessage {
 }
 ```
 
+### 5. MCP (Model Context Protocol) Integration
+
+**MCP Service** (background/mcpService.ts):
+- Manages connections to remote MCP servers via HTTP/SSE
+- Supports auto-detection of transport type (StreamableHTTP vs SSE)
+- Lists available tools and resources from connected servers
+- Handles tool invocations with timeout support
+- Maintains server state (connected, disconnected, connecting, error)
+
+**Tool Calling Modes:**
+1. **Prompt Mode** (default): Tools are injected into system prompt, AI outputs XML tags, regex parser extracts calls
+2. **Native Mode**: Tools passed via API's native tools parameter (requires API support)
+
+**MCP Server Configuration:**
+```typescript
+interface MCPServer {
+  id: string;
+  name: string;
+  url: string;                      // HTTP/SSE endpoint URL
+  enabled: boolean;
+  description?: string;
+  headers?: Record<string, string>; // Custom headers (auth tokens)
+  transportType?: 'auto' | 'streamableHttp' | 'sse';
+  timeout?: number;                 // Tool call timeout (default: 30s)
+}
+```
+
+**UI Components:**
+- `MCPSettings.tsx`: Server management UI with collapsible tools list
+  - Servers displayed with connection status badges
+  - Tool count badge when connected
+  - Collapsible tools section (collapsed by default)
+  - Each tool shows name, description, and expandable parameters
+  - Parameter details include type, required status, and descriptions
+- `useMCPServers.ts`: Hook for fetching server states, connecting/disconnecting
+
 ## UI/UX Guidelines
 
 ### User-Friendly Language
@@ -175,12 +226,28 @@ The extension uses **plain, friendly language** instead of technical jargon:
 
 ## Common Tasks
 
+### IMPORTANT: Always Build After Code Changes
+
+**After making ANY code changes, always run the build command:**
+```bash
+npm run build
+```
+
+This ensures:
+- TypeScript compilation succeeds
+- No build errors are introduced
+- The extension can be tested immediately
+- Changes are ready for the user to reload in Chrome
+
+Never skip the build step - the user needs the built extension to test your changes!
+
 ### Adding a New Component
 
 1. Create component in appropriate directory (`src/sidepanel/components/`)
 2. Use TypeScript with proper interfaces
 3. Import from `@/shared/` for shared types/utils (path alias configured)
 4. Follow existing patterns (functional components, hooks)
+5. **Run `npm run build` to verify changes compile correctly**
 
 ### Adding a New Message Type
 
@@ -188,6 +255,7 @@ The extension uses **plain, friendly language** instead of technical jargon:
 2. Create interface extending `BaseMessage`
 3. Add to `ExtensionMessage` union type
 4. Handle in `background/messageHandler.ts` or content script
+5. **Run `npm run build` to verify changes compile correctly**
 
 ### Modifying LLM Settings
 
@@ -195,6 +263,7 @@ The extension uses **plain, friendly language** instead of technical jargon:
 2. Update `DEFAULT_SETTINGS` in `src/shared/constants/index.ts`
 3. Add UI component in `src/sidepanel/components/Settings/`
 4. Update `SettingsPanel.tsx` to include new field
+5. **Run `npm run build` to verify changes compile correctly**
 
 ### Adding New AI Provider
 
@@ -203,15 +272,18 @@ The extension uses **plain, friendly language** instead of technical jargon:
 3. Add popular models to `POPULAR_MODELS`
 4. Update provider dropdown in `LLMProviderSettings.tsx`
 5. Test API compatibility in `background/llmService.ts`
+6. **Run `npm run build` to verify changes compile correctly**
 
 ## Build and Development
 
 ### Commands
 ```bash
 npm run dev      # Development with HMR
-npm run build    # Production build
+npm run build    # Production build (REQUIRED after every code change)
 npm run preview  # Preview production build
 ```
+
+**CRITICAL: Always run `npm run build` after making code changes!** The user needs the built extension to test. Never skip this step.
 
 ### Build Output
 ```
@@ -223,10 +295,17 @@ dist/
 └── service-worker-loader.js
 ```
 
-### Loading Extension
+### Loading Extension (User Instructions)
 1. Build: `npm run build`
 2. Chrome → Extensions → Developer mode → Load unpacked
 3. Select `dist/` folder
+4. After code changes: Build again, then click reload icon in Chrome extensions page
+
+### Development Workflow
+1. Make code changes
+2. **ALWAYS run `npm run build`** (don't skip this!)
+3. Inform user that build is complete
+4. User reloads extension in Chrome to test changes
 
 ## Testing Considerations
 
@@ -257,6 +336,15 @@ dist/
 - [ ] Settings persist across restarts
 - [ ] Invalid credentials show friendly errors
 
+**MCP Servers:**
+- [ ] Servers can be added/edited/deleted
+- [ ] Connection status updates correctly
+- [ ] Tools list is collapsible and displays tool count
+- [ ] Tool parameters show with correct types and required markers
+- [ ] Transport auto-detection works for different server types
+- [ ] Custom headers are sent with requests
+- [ ] Tool calls timeout after configured duration
+
 ## Code Quality
 
 ### TypeScript
@@ -275,6 +363,8 @@ dist/
 - Avoid inline styles
 - Use prose classes for markdown content
 - Consistent spacing and colors
+- Collapsible sections use `<details>` elements with custom CSS for arrow rotation
+- Status badges use semantic colors (green=enabled, blue=connected, red=error, yellow=connecting)
 
 ## Common Pitfalls
 
@@ -283,7 +373,9 @@ dist/
 3. **State updates**: Use functional updates for Zustand to avoid race conditions
 4. **Streaming**: Buffer incomplete SSE lines, handle disconnect properly
 5. **Content script timing**: May not be ready immediately, add retry logic
-6. **Storage limits**: chrome.storage.local has quota limits, monitor usage
+6. **Storage limits**: chrome.storage.local has quota limits, monitor usage (MAX_SESSIONS = 50)
+7. **MCP Transport**: Some servers only support SSE, others only StreamableHTTP - use 'auto' for fallback behavior
+8. **Tool Timeouts**: Long-running MCP tools need appropriate timeout configuration (default 30s, max 5min)
 
 ## Git Workflow
 
@@ -297,11 +389,40 @@ dist/
 - [Zustand Documentation](https://zustand-demo.pmnd.rs/)
 - [React Markdown](https://github.com/remarkjs/react-markdown)
 - [Tailwind CSS](https://tailwindcss.com/docs)
+- [Model Context Protocol (MCP) Specification](https://spec.modelcontextprotocol.io/)
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+
+## Recent Improvements (v1.1.2)
+
+**Content Extraction:**
+- Enhanced form field extraction (textareas, inputs, selects)
+- Smart label detection with 7 methods including parent traversal
+- Better support for web apps (GitHub, dashboards, documentation sites)
+- Fallback extraction with 15+ content selectors
+- Minimum content length validation (500 chars)
+
+**Storage Management:**
+- Automatic session cleanup (MAX_SESSIONS = 50)
+- QuotaExceededError handling with emergency recovery
+- Custom storage wrapper for robust persistence
+
+**UI Improvements:**
+- Auto-growing input box (2-10 rows with scrolling)
+- Copy button for page content with visual feedback
+- Fixed blank screen on refresh
+- MCP servers list with collapsible tools display
+
+**MCP Integration (v1.1.0):**
+- Full MCP server support with HTTP/SSE transports
+- Tool calling via prompt mode and native mode
+- Server configuration UI with status badges
+- Custom headers and timeout configuration
+- Collapsible tools list with parameter details
 
 ## Future Enhancements
 
 Potential areas for improvement:
-- Code splitting to reduce bundle size (currently 525KB)
+- Code splitting to reduce bundle size (currently ~544KB)
 - Image support in content extraction
 - Voice input/output
 - Multiple pages in one conversation
@@ -309,3 +430,4 @@ Potential areas for improvement:
 - Export chat history
 - Search within chat history
 - Keyboard shortcuts
+- MCP resources support (currently only tools are supported)

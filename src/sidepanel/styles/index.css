@@ -27,3 +27,21 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Collapsible details styling */
+details summary {
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Rotate arrow when details are open */
+details[open] > summary .details-marker {
+  transform: rotate(180deg);
+}
+
+details:not([open]) > summary .details-marker {
+  transform: rotate(0deg);
+}
