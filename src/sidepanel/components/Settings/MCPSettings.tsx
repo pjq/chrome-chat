@@ -191,13 +191,25 @@ export function MCPSettings() {
                   <p className="text-xs text-red-600 mt-1">Error: {state.error}</p>
                 )}
 
-                {/* Debug: Show state info when connected */}
-                {isConnected && state && (
-                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs font-mono">
-                    <div>Status: {state.status}</div>
-                    <div>Tools array exists: {state.tools ? 'Yes' : 'No'}</div>
-                    <div>Tools length: {state.tools?.length || 0}</div>
-                    <div>Tools: {JSON.stringify(state.tools?.map(t => t.name) || [])}</div>
+                {/* Warning: Show when connected but no tools */}
+                {isConnected && state && state.tools?.length === 0 && (
+                  <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-yellow-900 mb-1">No tools found</p>
+                        <p className="text-xs text-yellow-700">
+                          Connected successfully but server returned no tools. This may indicate:
+                        </p>
+                        <ul className="text-xs text-yellow-700 mt-1 ml-3 list-disc space-y-0.5">
+                          <li>Server has no tools available</li>
+                          <li>Server requires different authentication</li>
+                          <li>Server's tool schema is incompatible</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 )}
 
