@@ -1,8 +1,21 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '../common/Button';
 import { useChatStore } from '../../store/chatStore';
 import { generateMarkdownDocument, generateSafeFilename } from '@/shared/utils/markdown';
 import { downloadFile } from '@/shared/utils/chromeApi';
+
+/**
+ * Format bytes to human-readable size
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
+}
 
 export function MarkdownDownload() {
   const { getCurrentSession } = useChatStore();
@@ -12,6 +25,28 @@ export function MarkdownDownload() {
   const currentSession = getCurrentSession();
   const currentContent = currentSession?.content;
 
+  // Calculate markdown size
+  const contentInfo = useMemo(() => {
+    if (!currentContent) {
+      return { markdown: '', size: 0, sizeFormatted: '0 B' };
+    }
+
+    const markdown = generateMarkdownDocument(
+      currentContent.title,
+      currentContent.content,
+      currentContent.url
+    );
+
+    // Calculate byte size (UTF-8 encoding)
+    const size = new Blob([markdown]).size;
+
+    return {
+      markdown,
+      size,
+      sizeFormatted: formatBytes(size),
+    };
+  }, [currentContent]);
+
   const handleDownload = async () => {
     if (!currentContent) {
       return;
@@ -20,12 +55,8 @@ export function MarkdownDownload() {
     setIsDownloading(true);
 
     try {
-      // Generate markdown document
-      const markdown = generateMarkdownDocument(
-        currentContent.title,
-        currentContent.content,
-        currentContent.url
-      );
+      // Use pre-calculated markdown
+      const markdown = contentInfo.markdown;
 
       // Generate filename
       const filename = `${generateSafeFilename(currentContent.title)}.md`;
@@ -46,12 +77,8 @@ export function MarkdownDownload() {
     }
 
     try {
-      // Generate markdown document
-      const markdown = generateMarkdownDocument(
-        currentContent.title,
-        currentContent.content,
-        currentContent.url
-      );
+      // Use pre-calculated markdown
+      const markdown = contentInfo.markdown;
 
       // Copy to clipboard
       await navigator.clipboard.writeText(markdown);
@@ -71,7 +98,10 @@ export function MarkdownDownload() {
 
   return (
     <div className="border-t border-gray-200 bg-gray-50 p-3">
-      <div className="text-xs text-gray-600 mb-2 font-medium">Page Content</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs text-gray-600 font-medium">Page Content</div>
+        <div className="text-xs text-gray-500 font-mono">{contentInfo.sizeFormatted}</div>
+      </div>
       <div className="flex gap-2">
         <Button
           variant="secondary"
