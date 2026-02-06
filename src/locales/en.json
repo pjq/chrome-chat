@@ -1,0 +1,78 @@
+{
+  "app": {
+    "title": "Chrome Chat",
+    "description": "Chat with AI in your browser"
+  },
+  "components": {
+    "input": {
+      "placeholder": "Type your message here...",
+      "error": "There was an error with your input"
+    },
+    "button": {
+      "send": "Send",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saveChanges": "Save Changes",
+      "clearCache": "Clear Cache",
+      "resetApp": "Reset App",
+      "yesClearHistory": "Yes, Clear History",
+      "yesResetEverything": "Yes, Reset Everything",
+      "attachImage": "Attach image"
+    },
+    "chatInput": {
+      "placeholder": "Ask a question or paste an image...",
+      "instructions": "Press Enter to send, Shift+Enter for new line. Paste or click 📷 to add images."
+    },
+    "chatMessage": {
+      "copied": "Copied to clipboard!",
+      "copyFailed": "Failed to copy message",
+      "imageAlt": "Attached image"
+    },
+    "settings": {
+      "title": "Settings",
+      "instructionsLabel": "Instructions for AI",
+      "instructionsPlaceholder": "Tell the AI how you'd like it to respond...",
+      "dataManagement": {
+        "title": "Data Management",
+        "description": "Manage cached data and application settings.",
+        "chatHistory": {
+          "title": "Chat History",
+          "sessionsCount": "{count} {count, plural, one {session} other {sessions}} stored",
+          "confirmClear": {
+            "title": "Clear chat history?",
+            "message": "This will permanently delete all {count} chat {count, plural, one {session} other {sessions}}. This action cannot be undone.",
+            "confirmButton": "Yes, Clear History"
+          }
+        },
+        "resetApp": {
+          "title": "Reset Application",
+          "description": "Clear all data including settings and chat history",
+          "confirmClear": {
+            "title": "Reset entire application?",
+            "message": "This will permanently delete ALL data including:",
+            "items": [
+              "All chat sessions ({count} {count, plural, one {session} other {sessions}})",
+              "API keys and settings",
+              "MCP server configurations",
+              "All preferences"
+            ],
+            "warning": "The app will reload and reset to default state. This cannot be undone.",
+            "confirmButton": "Yes, Reset Everything"
+          }
+        }
+      }
+    },
+    "spinner": {
+      "loading": "Loading..."
+    }
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "saveFailed": "Failed to save settings",
+    "loadFailed": "Failed to load settings"
+  },
+  "notifications": {
+    "saved": "Settings saved successfully",
+    "cleared": "Cache cleared successfully"
+  }
+}

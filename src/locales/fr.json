@@ -1,0 +1,78 @@
+{
+  "app": {
+    "title": "Chat Chrome",
+    "description": "Discutez avec l'IA dans votre navigateur"
+  },
+  "components": {
+    "input": {
+      "placeholder": "Tapez votre message ici...",
+      "error": "Il y a eu une erreur avec votre saisie"
+    },
+    "button": {
+      "send": "Envoyer",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "saveChanges": "Enregistrer les modifications",
+      "clearCache": "Effacer le cache",
+      "resetApp": "Réinitialiser l'application",
+      "yesClearHistory": "Oui, effacer l'historique",
+      "yesResetEverything": "Oui, tout réinitialiser",
+      "attachImage": "Joindre une image"
+    },
+    "chatInput": {
+      "placeholder": "Posez une question ou collez une image...",
+      "instructions": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne. Collez ou cliquez sur 📷 pour ajouter des images."
+    },
+    "chatMessage": {
+      "copied": "Copié dans le presse-papiers !",
+      "copyFailed": "Échec de la copie du message",
+      "imageAlt": "Image jointe"
+    },
+    "settings": {
+      "title": "Paramètres",
+      "instructionsLabel": "Instructions pour l'IA",
+      "instructionsPlaceholder": "Dites à l'IA comment vous souhaitez qu'elle réponde...",
+      "dataManagement": {
+        "title": "Gestion des données",
+        "description": "Gérer les données mises en cache et les paramètres de l'application.",
+        "chatHistory": {
+          "title": "Historique des discussions",
+          "sessionsCount": "{count} {count, plural, one {session} other {sessions}} stockées",
+          "confirmClear": {
+            "title": "Effacer l'historique des discussions ?",
+            "message": "Cela supprimera définitivement toutes les {count} discussions {count, plural, one {session} other {sessions}}. Cette action ne peut pas être annulée.",
+            "confirmButton": "Oui, effacer l'historique"
+          }
+        },
+        "resetApp": {
+          "title": "Réinitialiser l'application",
+          "description": "Effacer toutes les données y compris les paramètres et l'historique des discussions",
+          "confirmClear": {
+            "title": "Réinitialiser l'ensemble de l'application ?",
+            "message": "Cela supprimera définitivement TOUTES les données, y compris :",
+            "items": [
+              "Toutes les sessions de discussion ({count} {count, plural, one {session} other {sessions}})",
+              "Les clés API et les paramètres",
+              "Les configurations du serveur MCP",
+              "Toutes les préférences"
+            ],
+            "warning": "L'application se recharge et revient à l'état par défaut. Ceci ne peut pas être annulé.",
+            "confirmButton": "Oui, tout réinitialiser"
+          }
+        }
+      }
+    },
+    "spinner": {
+      "loading": "Chargement..."
+    }
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite",
+    "saveFailed": "Échec de l'enregistrement des paramètres",
+    "loadFailed": "Échec du chargement des paramètres"
+  },
+  "notifications": {
+    "saved": "Paramètres enregistrés avec succès",
+    "cleared": "Cache effacé avec succès"
+  }
+}
